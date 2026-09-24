@@ -7,7 +7,9 @@ import { supabase } from './supabase'
  */
 export function useRealtime(tables: string[], onChange: () => void) {
   const cb = useRef(onChange)
-  cb.current = onChange
+  useEffect(() => {
+    cb.current = onChange
+  })
   const key = tables.join(',')
 
   useEffect(() => {

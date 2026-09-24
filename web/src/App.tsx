@@ -31,9 +31,9 @@ function Gate() {
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<StocksPage />} />
-        <Route path="beginning" element={<MovementPage config={BEGINNING} />} />
-        <Route path="withdraw" element={<MovementPage config={WITHDRAW} />} />
-        <Route path="received" element={<MovementPage config={RECEIVED} />} />
+        <Route path="beginning" element={<MovementPage key="beginning" config={BEGINNING} />} />
+        <Route path="withdraw" element={<MovementPage key="withdraw" config={WITHDRAW} />} />
+        <Route path="received" element={<MovementPage key="received" config={RECEIVED} />} />
         <Route path="items" element={isAdmin ? <ItemsPage /> : <Navigate to="/" />} />
         {NAV.filter((n) => n.soon).map((n) => (
           <Route key={n.to} path={n.to.slice(1)} element={<ComingSoon title={n.label} />} />

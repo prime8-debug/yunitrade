@@ -22,8 +22,11 @@ export function ItemHistory({ item, onClose }: { item: StockRow; onClose: () => 
   }, [load])
   useRealtime(['inventory_transactions'], load)
 
-  let running = 0
-  const withBalance = rows.map((r) => ({ ...r, balance: (running += Number(r.quantity)) }))
+  const withBalance = rows.reduce<(LedgerRow & { balance: number })[]>((acc, r) => {
+    const prev = acc.length ? acc[acc.length - 1].balance : 0
+    acc.push({ ...r, balance: prev + Number(r.quantity) })
+    return acc
+  }, [])
 
   return (
     <div className="fixed inset-0 z-20 flex justify-end bg-black/30" onClick={onClose}>

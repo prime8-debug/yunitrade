@@ -41,14 +41,6 @@ export function MovementPage({ config }: { config: MovementConfig }) {
   }, [loadRecent])
   useRealtime([config.table], loadRecent)
 
-  // Reset the form when switching between Beginning / Received / Withdraw.
-  useEffect(() => {
-    setItem(null)
-    setQuantity('')
-    setExtra({})
-    setMessage(null)
-  }, [config.table])
-
   const qty = Number(quantity)
   const overStock = config.checksStock && item != null && qty > Number(item.on_hand)
 
