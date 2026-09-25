@@ -75,7 +75,7 @@ export function MovementPage({ config }: { config: MovementConfig }) {
     <div className="space-y-6">
       <h1 className="page-title">{config.title}</h1>
 
-      <form onSubmit={submit} className="card p-5 grid gap-4 md:grid-cols-2">
+      <form onSubmit={submit} className="card p-5 grid gap-4 md:grid-cols-2 max-w-2xl">
         <div className="md:col-span-2">
           <span className="label">Item</span>
           <ItemPicker value={item} onChange={setItem} />
