@@ -1,4 +1,5 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+// HashRouter: GitHub Pages has no SPA fallback, so /withdraw would 404 on refresh.
+import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
 import { Layout, NAV } from './components/Layout'
 import { ItemsPage } from './features/items/ItemsPage'
@@ -60,9 +61,9 @@ export default function App() {
   }
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <HashRouter>
         <Gate />
-      </BrowserRouter>
+      </HashRouter>
     </AuthProvider>
   )
 }
