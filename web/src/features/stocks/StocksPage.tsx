@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
-import { formatQty, formatSize, type StockRow } from '../../lib/types'
+import { formatQty, type StockRow } from '../../lib/types'
 import { ItemHistory } from './ItemHistory'
 
 export function StocksPage() {
@@ -57,7 +57,10 @@ export function StocksPage() {
             <tr>
               <th>Item Code</th>
               <th>Description</th>
-              <th>Size</th>
+              <th className="text-right">W</th>
+              <th>W-UM</th>
+              <th className="text-right">L</th>
+              <th>L-UM</th>
               <th className="text-right">Beginning</th>
               <th className="text-right">Received</th>
               <th className="text-right">Withdrawn</th>
@@ -67,14 +70,14 @@ export function StocksPage() {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={7} className="text-center text-slate-400 py-8">
+                <td colSpan={9} className="text-center text-slate-400 py-8">
                   Loading…
                 </td>
               </tr>
             )}
             {!loading && visible.length === 0 && (
               <tr>
-                <td colSpan={7} className="text-center text-slate-400 py-8">
+                <td colSpan={9} className="text-center text-slate-400 py-8">
                   No items.
                 </td>
               </tr>
@@ -83,7 +86,10 @@ export function StocksPage() {
               <tr key={r.item_id} className="cursor-pointer hover:bg-slate-50" onClick={() => setSelected(r)}>
                 <td className="font-mono font-semibold">{r.item_code}</td>
                 <td>{r.description}</td>
-                <td className="whitespace-nowrap">{formatSize(r)}</td>
+                <td className="text-right">{r.width ?? ''}</td>
+                <td>{r.width_unit ?? ''}</td>
+                <td className="text-right">{r.length ?? ''}</td>
+                <td>{r.length_unit ?? ''}</td>
                 <td className="text-right">{formatQty(r.beginning)}</td>
                 <td className="text-right">{formatQty(r.received)}</td>
                 <td className="text-right">{formatQty(r.withdrawn)}</td>
