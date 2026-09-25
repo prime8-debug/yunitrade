@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { formatQty, formatSize, type StockRow } from '../lib/types'
+import { formatQty, type StockRow } from '../lib/types'
 
 interface Props {
   value: StockRow | null
@@ -38,8 +38,17 @@ export function ItemPicker({ value, onChange }: Props) {
       <div className="flex items-center justify-between rounded border border-slate-300 bg-slate-50 px-3 py-2">
         <div>
           <div className="font-mono font-semibold">{value.item_code}</div>
-          <div className="text-xs text-slate-500">
-            {value.description} {formatSize(value) && `· ${formatSize(value)}`}
+          <div className="text-xs text-slate-500">{value.description}</div>
+        </div>
+        {/* W / L come from the item master — display only, never re-entered here. */}
+        <div className="flex items-center gap-4 px-4">
+          <div className="text-right">
+            <div className="text-xs text-slate-500">W ({value.width_unit ?? '—'})</div>
+            <div className="font-semibold">{value.width ?? '—'}</div>
+          </div>
+          <div className="text-right">
+            <div className="text-xs text-slate-500">L ({value.length_unit ?? '—'})</div>
+            <div className="font-semibold">{value.length ?? '—'}</div>
           </div>
         </div>
         <div className="text-right">
