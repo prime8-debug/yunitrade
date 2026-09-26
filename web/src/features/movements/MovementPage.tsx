@@ -14,6 +14,12 @@ interface RecentRow {
   entry_date: string
   quantity: number
   voided_at: string | null
+  // The entry's own size (added after some records already existed — those fall
+  // back to the item's default size, shown via the joined `item` below).
+  width: number | null
+  width_unit: string | null
+  length: number | null
+  length_unit: string | null
   item: {
     item_code: string
     description: string
@@ -30,10 +36,20 @@ export function MovementPage({ config }: { config: MovementConfig }) {
   const [item, setItem] = useState<StockRow | null>(null)
   const [date, setDate] = useState(today)
   const [quantity, setQuantity] = useState('')
+  const [width, setWidth] = useState('')
+  const [length, setLength] = useState('')
   const [extra, setExtra] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
   const [recent, setRecent] = useState<RecentRow[]>([])
+
+  // Selecting an item defaults Width/Length to its usual size — still editable
+  // per entry (e.g. a custom-cut length shorter than the full roll).
+  function pickItem(next: StockRow | null) {
+    setItem(next)
+    setWidth(next?.width?.toString() ?? '')
+    setLength(next?.length?.toString() ?? '')
+  }
 
   const loadRecent = useCallback(async () => {
     if (config.showCatalog) return
@@ -60,7 +76,15 @@ export function MovementPage({ config }: { config: MovementConfig }) {
 
     setBusy(true)
     setMessage(null)
-    const params: Record<string, unknown> = { p_item_id: item.item_id, p_quantity: qty, p_entry_date: date }
+    const params: Record<string, unknown> = {
+      p_item_id: item.item_id,
+      p_quantity: qty,
+      p_entry_date: date,
+      p_width: width.trim() === '' ? null : Number(width),
+      p_width_unit: item.width_unit ?? null,
+      p_length: length.trim() === '' ? null : Number(length),
+      p_length_unit: item.length_unit ?? null,
+    }
     for (const f of config.fields) params[f.param] = extra[f.name]?.trim() || null
 
     const { error } = await supabase.rpc(config.rpc, params)
@@ -68,7 +92,7 @@ export function MovementPage({ config }: { config: MovementConfig }) {
     if (error) return setMessage({ kind: 'error', text: errorMessage(error) })
 
     setMessage({ kind: 'ok', text: `${config.title} saved: ${item.item_code} × ${formatQty(qty)}` })
-    setItem(null)
+    pickItem(null)
     setQuantity('')
     setExtra({})
   }
@@ -87,7 +111,7 @@ export function MovementPage({ config }: { config: MovementConfig }) {
       <form onSubmit={submit} className="card p-5 grid gap-4 md:grid-cols-2 max-w-2xl">
         <div className="md:col-span-2">
           <span className="label">Item</span>
-          <ItemPicker value={item} onChange={setItem} />
+          <ItemPicker value={item} onChange={pickItem} />
         </div>
         <label>
           <span className="label">Date</span>
@@ -105,6 +129,14 @@ export function MovementPage({ config }: { config: MovementConfig }) {
             onChange={(e) => setQuantity(e.target.value)}
           />
           {overStock && <span className="text-xs text-red-600">More than on hand ({formatQty(item!.on_hand)})</span>}
+        </label>
+        <label>
+          <span className="label">Width {item?.width_unit && <span className="text-slate-400">({item.width_unit})</span>}</span>
+          <input className="input" type="number" step="any" min="0" value={width} onChange={(e) => setWidth(e.target.value)} />
+        </label>
+        <label>
+          <span className="label">Length {item?.length_unit && <span className="text-slate-400">({item.length_unit})</span>}</span>
+          <input className="input" type="number" step="any" min="0" value={length} onChange={(e) => setLength(e.target.value)} />
         </label>
         {config.fields.map((f) => (
           <label key={f.name} className={f.wide ? 'md:col-span-2' : ''}>
@@ -154,10 +186,10 @@ export function MovementPage({ config }: { config: MovementConfig }) {
                       <span className="font-mono font-semibold">{r.item?.item_code}</span>{' '}
                       <span className="text-slate-500">{r.item?.description}</span>
                     </td>
-                    <td className="text-right">{r.item?.width ?? ''}</td>
-                    <td>{r.item?.width_unit ?? ''}</td>
-                    <td className="text-right">{r.item?.length ?? ''}</td>
-                    <td>{r.item?.length_unit ?? ''}</td>
+                    <td className="text-right">{r.width ?? r.item?.width ?? ''}</td>
+                    <td>{r.width_unit ?? r.item?.width_unit ?? ''}</td>
+                    <td className="text-right">{r.length ?? r.item?.length ?? ''}</td>
+                    <td>{r.length_unit ?? r.item?.length_unit ?? ''}</td>
                     <td className="text-right">{formatQty(r.quantity)}</td>
                     {config.fields.map((f) => (
                       <td key={f.name}>{String(r[f.name] ?? '')}</td>
