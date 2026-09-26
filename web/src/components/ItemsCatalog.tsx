@@ -43,7 +43,7 @@ export function ItemsCatalog({ editableBeginning }: Props) {
               <th>Description</th>
               <th>Size</th>
               <th>UOM</th>
-              <th>Category</th>
+              {!editableBeginning && <th>Category</th>}
               <th className="text-right">{editableBeginning ? 'Quantity' : 'Beginning'}</th>
               <th className="text-right">On Hand</th>
             </tr>
@@ -66,7 +66,7 @@ export function ItemsCatalog({ editableBeginning }: Props) {
             )}
             {visible.length === 0 && (
               <tr>
-                <td colSpan={7} className="text-center text-slate-400 py-6">
+                <td colSpan={editableBeginning ? 6 : 7} className="text-center text-slate-400 py-6">
                   No items.
                 </td>
               </tr>
@@ -118,7 +118,6 @@ function BeginningRow({ item }: { item: StockRow }) {
       <td>{item.description}</td>
       <td className="whitespace-nowrap">{formatSize(item)}</td>
       <td>{item.uom}</td>
-      <td>{item.category}</td>
       <td className="text-right">
         <input
           key={`${item.item_id}-${item.beginning}`}
