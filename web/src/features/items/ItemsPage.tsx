@@ -144,7 +144,7 @@ export function ItemsPage() {
                 <th>UOM</th>
                 <th>Category</th>
                 <th>Status</th>
-                <th>Remarks</th>
+                <th className="w-72">Remarks</th>
                 <th />
               </tr>
             </thead>
@@ -157,7 +157,7 @@ export function ItemsPage() {
                   <td>{i.uom}</td>
                   <td>{i.category}</td>
                   <td>{i.active ? 'Active' : 'Inactive'}</td>
-                  <td className="text-slate-500">{i.remarks}</td>
+                  <td className="text-slate-500 whitespace-normal break-words">{i.remarks}</td>
                   <td className="text-right whitespace-nowrap space-x-3">
                     <button className="text-xs text-blue-600 underline" onClick={() => edit(i)}>
                       Edit
