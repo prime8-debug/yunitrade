@@ -16,6 +16,8 @@ export interface Item {
   width_unit: string | null
   length: number | null
   length_unit: string | null
+  /** Unit the quantity is counted in for this item: ROLLS, PC, SQFT, SQM, GAL, KG, SHEETS, ... */
+  uom: string | null
   category: string | null
   active: boolean
 }
@@ -28,6 +30,7 @@ export interface StockRow {
   width_unit: string | null
   length: number | null
   length_unit: string | null
+  uom: string | null
   category: string | null
   active: boolean
   on_hand: number

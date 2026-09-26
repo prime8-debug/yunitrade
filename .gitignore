@@ -1,0 +1,10 @@
+# Anything that can identify or authenticate — never commit these.
+.env.import.local
+*.local
+data/
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store

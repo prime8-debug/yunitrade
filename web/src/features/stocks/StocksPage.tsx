@@ -61,6 +61,7 @@ export function StocksPage() {
               <th>W-UM</th>
               <th className="text-right">L</th>
               <th>L-UM</th>
+              <th>UOM</th>
               <th className="text-right">Beginning</th>
               <th className="text-right">Received</th>
               <th className="text-right">Withdrawn</th>
@@ -70,14 +71,14 @@ export function StocksPage() {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={9} className="text-center text-slate-400 py-8">
+                <td colSpan={10} className="text-center text-slate-400 py-8">
                   Loading…
                 </td>
               </tr>
             )}
             {!loading && visible.length === 0 && (
               <tr>
-                <td colSpan={9} className="text-center text-slate-400 py-8">
+                <td colSpan={10} className="text-center text-slate-400 py-8">
                   No items.
                 </td>
               </tr>
@@ -90,6 +91,7 @@ export function StocksPage() {
                 <td>{r.width_unit ?? ''}</td>
                 <td className="text-right">{r.length ?? ''}</td>
                 <td>{r.length_unit ?? ''}</td>
+                <td>{r.uom ?? ''}</td>
                 <td className="text-right">{formatQty(r.beginning)}</td>
                 <td className="text-right">{formatQty(r.received)}</td>
                 <td className="text-right">{formatQty(r.withdrawn)}</td>

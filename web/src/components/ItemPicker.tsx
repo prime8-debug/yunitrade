@@ -53,7 +53,9 @@ export function ItemPicker({ value, onChange }: Props) {
         </div>
         <div className="text-right">
           <div className="text-xs text-slate-500">On hand</div>
-          <div className="font-semibold">{formatQty(value.on_hand)}</div>
+          <div className="font-semibold">
+            {formatQty(value.on_hand)} {value.uom && <span className="text-xs font-normal text-slate-500">{value.uom}</span>}
+          </div>
         </div>
         <button type="button" className="ml-3 text-sm text-blue-600 underline" onClick={() => onChange(null)}>
           Change
@@ -93,7 +95,9 @@ export function ItemPicker({ value, onChange }: Props) {
                   <span className="font-mono font-semibold">{r.item_code}</span>{' '}
                   <span className="text-sm text-slate-500">{r.description}</span>
                 </span>
-                <span className="text-sm text-slate-600 whitespace-nowrap">{formatQty(r.on_hand)}</span>
+                <span className="text-sm text-slate-600 whitespace-nowrap">
+                  {formatQty(r.on_hand)} {r.uom}
+                </span>
               </button>
             </li>
           ))}

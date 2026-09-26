@@ -3,7 +3,7 @@ import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
 import { formatSize, type Item } from '../../lib/types'
 
-const EMPTY = { item_code: '', description: '', width: '', width_unit: '', length: '', length_unit: '', category: '' }
+const EMPTY = { item_code: '', description: '', width: '', width_unit: '', length: '', length_unit: '', uom: '', category: '' }
 
 /** ADMIN: item master data. RLS also blocks non-admin writes server-side. */
 export function ItemsPage() {
@@ -38,6 +38,7 @@ export function ItemsPage() {
       width_unit: form.width_unit.trim() || null,
       length: form.length === '' ? null : Number(form.length),
       length_unit: form.length_unit.trim() || null,
+      uom: form.uom.trim().toUpperCase() || null,
       category: form.category.trim() || null,
       updated_at: new Date().toISOString(),
     }
@@ -59,6 +60,7 @@ export function ItemsPage() {
       width_unit: i.width_unit ?? '',
       length: i.length?.toString() ?? '',
       length_unit: i.length_unit ?? '',
+      uom: i.uom ?? '',
       category: i.category ?? '',
     })
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -98,11 +100,15 @@ export function ItemsPage() {
           <span className="label">Length Unit</span>
           <input className="input" placeholder="yd / m / ft" value={form.length_unit} onChange={set('length_unit')} />
         </label>
-        <label className="md:col-span-2">
+        <label>
+          <span className="label">Stocking UOM</span>
+          <input className="input" placeholder="ROLLS / PC / SQFT" value={form.uom} onChange={set('uom')} />
+        </label>
+        <label>
           <span className="label">Category</span>
           <input className="input" value={form.category} onChange={set('category')} />
         </label>
-        <div className="md:col-span-2 flex items-end gap-3">
+        <div className="md:col-span-4 flex items-end gap-3">
           <button className="btn-primary">{editingId ? 'Update Item' : 'Add Item'}</button>
           {editingId && (
             <button
@@ -129,6 +135,7 @@ export function ItemsPage() {
                 <th>Item Code</th>
                 <th>Description</th>
                 <th>Size</th>
+                <th>UOM</th>
                 <th>Category</th>
                 <th>Status</th>
                 <th />
@@ -140,6 +147,7 @@ export function ItemsPage() {
                   <td className="font-mono font-semibold">{i.item_code}</td>
                   <td>{i.description}</td>
                   <td className="whitespace-nowrap">{formatSize(i)}</td>
+                  <td>{i.uom}</td>
                   <td>{i.category}</td>
                   <td>{i.active ? 'Active' : 'Inactive'}</td>
                   <td className="text-right whitespace-nowrap space-x-3">

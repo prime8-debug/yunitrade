@@ -92,7 +92,7 @@ export function MovementPage({ config }: { config: MovementConfig }) {
           <input className="input" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
         <label>
-          <span className="label">Quantity</span>
+          <span className="label">Quantity {item?.uom && <span className="text-slate-400">({item.uom})</span>}</span>
           <input
             className={`input ${overStock ? 'border-red-500' : ''}`}
             type="number"

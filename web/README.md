@@ -7,8 +7,9 @@ stock movement goes through a database function (`post_withdrawal`, etc.).
 ## First-time setup
 
 1. **Create a Supabase project** at https://supabase.com.
-2. **Create the database**: Dashboard → SQL Editor → paste and run
-   [`../supabase/migrations/0001_inventory_core.sql`](../supabase/migrations/0001_inventory_core.sql).
+2. **Create the database**: Dashboard → SQL Editor → paste and run, in order:
+   [`../supabase/migrations/0001_inventory_core.sql`](../supabase/migrations/0001_inventory_core.sql), then
+   [`../supabase/migrations/0002_items_uom.sql`](../supabase/migrations/0002_items_uom.sql).
 3. **Create users**: Dashboard → Authentication → Users → *Add user* (email + password,
    tick *Auto confirm*). A `profiles` row is created automatically with role `USER`.
 4. **Make yourself ADMIN** (SQL Editor):
@@ -35,6 +36,26 @@ stock movement goes through a database function (`post_withdrawal`, etc.).
 
 Other menu entries (Sales Orders, Served, 3M Yards, Partial Rolls, Search, Audit) are placeholders.
 
+## Bulk-loading item codes from the Google Sheet
+
+1. Export the item-code sheet as CSV with headers `ITEMCODE, Item Description, WIDTH, W-UNIT,
+   LENGTH, L-UNIT, STOCKING UNIT MEASURE` and save it as `../data/ITEMCODES.csv` (gitignored).
+2. Copy `../.env.import.local.example` to `../.env.import.local` and fill in your Project URL
+   and **service_role** key (Dashboard → Project Settings → API — not the anon key; this key
+   bypasses RLS to bulk-write, so it's kept out of the frontend entirely).
+3. Dry run first (writes nothing, just reports problems):
+   ```
+   npm run import:items
+   ```
+   It flags duplicate item codes (keeping the first, skipping the rest) and any WIDTH/LENGTH
+   value it couldn't read as a number. Fix the sheet and re-export if anything looks wrong.
+4. When the dry run looks right, actually write it:
+   ```
+   npm run import:items -- --commit
+   ```
+   Safe to re-run — it upserts by `item_code`, so re-running after fixing a few rows just
+   updates them instead of creating duplicates.
+
 ## Milestone test
 
 Open the app in two browsers (Desktop A / Desktop B), add an item, post Beginning 100,
@@ -46,3 +67,7 @@ Received 50, Withdraw 20 → both should show **130** on hand without refreshing
 - Negative stock is **not** allowed.
 - Quantities may be decimals.
 - Only ADMIN can void; USER can post Beginning / Received / Withdraw.
+- One item code = one fixed width/length/UOM. The real sheet has **`STAMARK N450`** listed
+  twice with two different widths (24in and 12in) — that's not possible under this rule. The
+  import kept the first row and skipped the second; if both sizes are real stock, give the
+  second one its own code (e.g. `STAMARK N450-12`) in the sheet and re-run the import.
