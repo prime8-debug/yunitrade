@@ -108,23 +108,29 @@ export function MovementPage({ config }: { config: MovementConfig }) {
     if (error) setMessage({ kind: 'error', text: errorMessage(error) })
   }
 
+  const isBeginning = config.table === 'beginning_inventory'
+
+  const dateField = (
+    <label>
+      <span className="label">Date</span>
+      <input className="input max-w-xs" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+    </label>
+  )
+
   return (
     <div className="space-y-6">
       <h1 className="page-title">{config.title}</h1>
 
-      <form onSubmit={submit} className="card p-5 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <div className="md:col-span-2 lg:col-span-4">
+      <form onSubmit={submit} className={`card p-5 grid gap-4 md:grid-cols-2 ${isBeginning ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
+        <div className={isBeginning ? '' : 'md:col-span-2 lg:col-span-4'}>
           <span className="label">Item</span>
           <ItemPicker value={item} onChange={pickItem} />
         </div>
-        <label className="md:col-span-2 lg:col-span-4">
+        <label className={isBeginning ? '' : 'md:col-span-2 lg:col-span-4'}>
           <span className="label">Description</span>
           <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} />
         </label>
-        <label>
-          <span className="label">Date</span>
-          <input className="input max-w-xs" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
-        </label>
+        {!isBeginning && dateField}
         <label>
           <span className="label">Quantity {item?.uom && <span className="text-slate-400">({item.uom})</span>}</span>
           <input
@@ -146,6 +152,7 @@ export function MovementPage({ config }: { config: MovementConfig }) {
           <span className="label">Length {item?.length_unit && <span className="text-slate-400">({item.length_unit})</span>}</span>
           <input className="input max-w-xs" type="number" step="any" min="0" value={length} onChange={(e) => setLength(e.target.value)} />
         </label>
+        {isBeginning && dateField}
         {config.fields.map((f) => (
           <label key={f.name} className={f.wide ? 'md:col-span-2' : ''}>
             <span className="label">{f.label}</span>
@@ -156,7 +163,7 @@ export function MovementPage({ config }: { config: MovementConfig }) {
             />
           </label>
         ))}
-        <div className="md:col-span-2 lg:col-span-4 flex items-center gap-3">
+        <div className={`md:col-span-2 ${isBeginning ? 'lg:col-span-5' : 'lg:col-span-4'} flex items-center gap-3`}>
           <button className="btn-primary" disabled={busy || overStock}>
             {busy ? 'Saving…' : `Save ${config.title}`}
           </button>
