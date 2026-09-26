@@ -7,7 +7,11 @@ interface Props {
   onChange: (item: StockRow | null) => void
 }
 
-/** Item-code autocomplete. Searches code + description, shows on-hand stock. */
+/**
+ * Item-code autocomplete. Searches code + description, shows on-hand stock.
+ * Picking an item (click, or typing the exact code and pressing Enter) fills
+ * its Description/Width/Length/UOM back into the form automatically.
+ */
 export function ItemPicker({ value, onChange }: Props) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<StockRow[]>([])
@@ -76,6 +80,16 @@ export function ItemPicker({ value, onChange }: Props) {
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return
+          e.preventDefault() // don't submit the form while still picking an item
+          const exact = results.find((r) => r.item_code.toLowerCase() === query.trim().toLowerCase())
+          if (exact) {
+            onChange(exact)
+            setQuery('')
+            setOpen(false)
+          }
+        }}
       />
       {open && results.length > 0 && (
         <ul className="absolute z-10 mt-1 w-full max-h-72 overflow-auto rounded border border-slate-200 bg-white shadow-lg">
