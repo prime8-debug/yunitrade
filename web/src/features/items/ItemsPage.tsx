@@ -73,6 +73,27 @@ export function ItemsPage() {
     if (error) setMessage({ kind: 'error', text: errorMessage(error) })
   }
 
+  async function remove(i: Item) {
+    if (!window.confirm(`Delete ${i.item_code} — "${i.description}"?\nThis cannot be undone.`)) return
+    const { error } = await supabase.from('items').delete().eq('id', i.id)
+    if (error) {
+      // Foreign-key violation: the item has ledger/document history and Postgres refused to delete it.
+      setMessage({
+        kind: 'error',
+        text:
+          error.code === '23503'
+            ? `Can't delete ${i.item_code} — it already has inventory history. Deactivate it instead.`
+            : errorMessage(error),
+      })
+      return
+    }
+    setMessage({ kind: 'ok', text: `Deleted ${i.item_code}` })
+    if (editingId === i.id) {
+      setEditingId(null)
+      setForm(EMPTY)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="page-title">Items</h1>
@@ -164,6 +185,9 @@ export function ItemsPage() {
                     </button>
                     <button className="text-xs text-slate-600 underline" onClick={() => toggleActive(i)}>
                       {i.active ? 'Deactivate' : 'Activate'}
+                    </button>
+                    <button className="text-xs text-red-600 underline" onClick={() => remove(i)}>
+                      Delete
                     </button>
                   </td>
                 </tr>
