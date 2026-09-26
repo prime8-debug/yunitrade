@@ -122,7 +122,7 @@ function BeginningRow({ item }: { item: StockRow }) {
       <td className="text-right">
         <input
           key={`${item.item_id}-${item.beginning}`}
-          className={`input w-8 px-1 text-right py-1 ${error ? 'border-red-500' : ''}`}
+          className={`input w-24 text-right py-1 ${error ? 'border-red-500' : ''}`}
           type="number"
           step="any"
           min="0"
