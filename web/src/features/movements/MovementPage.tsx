@@ -101,6 +101,14 @@ export function MovementPage({ config }: { config: MovementConfig }) {
     setExtra({})
   }
 
+  function clearForm() {
+    pickItem(null)
+    setDate(today())
+    setQuantity('')
+    setExtra({})
+    setMessage(null)
+  }
+
   async function voidEntry(row: RecentRow) {
     const reason = window.prompt(`Void this ${config.title.toLowerCase()} for ${row.item?.item_code} × ${formatQty(row.quantity)}?\nReason:`)
     if (reason === null) return
@@ -159,6 +167,9 @@ export function MovementPage({ config }: { config: MovementConfig }) {
         <div className="md:col-span-2 lg:col-span-5 flex items-center gap-3">
           <button className="btn-primary" disabled={busy || overStock}>
             {busy ? 'Saving…' : `Save ${config.title}`}
+          </button>
+          <button type="button" className="btn-secondary" onClick={clearForm} disabled={busy}>
+            Clear
           </button>
           {message && <span className={`text-sm ${message.kind === 'ok' ? 'text-green-700' : 'text-red-600'}`}>{message.text}</span>}
         </div>
