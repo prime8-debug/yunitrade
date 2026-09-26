@@ -3,7 +3,7 @@ import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
 import { formatSize, type Item } from '../../lib/types'
 
-const EMPTY = { item_code: '', description: '', width: '', width_unit: '', length: '', length_unit: '', uom: '', category: '' }
+const EMPTY = { item_code: '', description: '', width: '', width_unit: '', length: '', length_unit: '', uom: '', category: '', remarks: '' }
 
 /** ADMIN: item master data. RLS also blocks non-admin writes server-side. */
 export function ItemsPage() {
@@ -40,6 +40,7 @@ export function ItemsPage() {
       length_unit: form.length_unit.trim() || null,
       uom: form.uom.trim().toUpperCase() || null,
       category: form.category.trim() || null,
+      remarks: form.remarks.trim() || null,
       updated_at: new Date().toISOString(),
     }
     const { error } = editingId
@@ -62,6 +63,7 @@ export function ItemsPage() {
       length_unit: i.length_unit ?? '',
       uom: i.uom ?? '',
       category: i.category ?? '',
+      remarks: i.remarks ?? '',
     })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -108,6 +110,10 @@ export function ItemsPage() {
           <span className="label">Category</span>
           <input className="input" value={form.category} onChange={set('category')} />
         </label>
+        <label className="md:col-span-4">
+          <span className="label">Remarks</span>
+          <input className="input" value={form.remarks} onChange={set('remarks')} />
+        </label>
         <div className="md:col-span-4 flex items-end gap-3">
           <button className="btn-primary">{editingId ? 'Update Item' : 'Add Item'}</button>
           {editingId && (
@@ -138,6 +144,7 @@ export function ItemsPage() {
                 <th>UOM</th>
                 <th>Category</th>
                 <th>Status</th>
+                <th>Remarks</th>
                 <th />
               </tr>
             </thead>
@@ -150,6 +157,7 @@ export function ItemsPage() {
                   <td>{i.uom}</td>
                   <td>{i.category}</td>
                   <td>{i.active ? 'Active' : 'Inactive'}</td>
+                  <td className="text-slate-500">{i.remarks}</td>
                   <td className="text-right whitespace-nowrap space-x-3">
                     <button className="text-xs text-blue-600 underline" onClick={() => edit(i)}>
                       Edit

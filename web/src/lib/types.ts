@@ -20,6 +20,7 @@ export interface Item {
   uom: string | null
   category: string | null
   active: boolean
+  remarks: string | null
 }
 
 export interface StockRow {
