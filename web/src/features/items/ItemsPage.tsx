@@ -98,7 +98,7 @@ export function ItemsPage() {
     <div className="space-y-6">
       <h1 className="page-title">Items</h1>
 
-      <form onSubmit={submit} className="card p-5 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <form onSubmit={submit} className="card p-5 grid gap-4 md:grid-cols-2 lg:grid-cols-6">
         <label>
           <span className="label">Item Code</span>
           <input className="input max-w-xs font-mono" required value={form.item_code} onChange={set('item_code')} />
@@ -135,7 +135,7 @@ export function ItemsPage() {
           <span className="label">Remarks</span>
           <input className="input" value={form.remarks} onChange={set('remarks')} />
         </label>
-        <div className="md:col-span-2 lg:col-span-5 flex items-end gap-3">
+        <div className="md:col-span-2 lg:col-span-6 flex items-end gap-3">
           <button className="btn-primary">{editingId ? 'Update Item' : 'Add Item'}</button>
           {editingId && (
             <button
@@ -150,7 +150,7 @@ export function ItemsPage() {
             </button>
           )}
         </div>
-        {message && <p className={`md:col-span-2 lg:col-span-5 text-sm ${message.kind === 'ok' ? 'text-green-700' : 'text-red-600'}`}>{message.text}</p>}
+        {message && <p className={`md:col-span-2 lg:col-span-6 text-sm ${message.kind === 'ok' ? 'text-green-700' : 'text-red-600'}`}>{message.text}</p>}
       </form>
 
       <div>
