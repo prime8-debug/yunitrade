@@ -13,7 +13,14 @@ interface RecentRow {
   entry_date: string
   quantity: number
   voided_at: string | null
-  item: { item_code: string; description: string } | null
+  item: {
+    item_code: string
+    description: string
+    width: number | null
+    width_unit: string | null
+    length: number | null
+    length_unit: string | null
+  } | null
   [field: string]: unknown
 }
 
@@ -30,7 +37,7 @@ export function MovementPage({ config }: { config: MovementConfig }) {
   const loadRecent = useCallback(async () => {
     const { data } = await supabase
       .from(config.table)
-      .select('*, item:items(item_code, description)')
+      .select('*, item:items(item_code, description, width, width_unit, length, length_unit)')
       .order('created_at', { ascending: false })
       .limit(50)
     setRecent((data as RecentRow[]) ?? [])
@@ -119,6 +126,10 @@ export function MovementPage({ config }: { config: MovementConfig }) {
               <tr>
                 <th>Date</th>
                 <th>Item</th>
+                <th className="text-right">W</th>
+                <th>W-UM</th>
+                <th className="text-right">L</th>
+                <th>L-UM</th>
                 <th className="text-right">Qty</th>
                 {config.fields.map((f) => (
                   <th key={f.name}>{f.label}</th>
@@ -134,6 +145,10 @@ export function MovementPage({ config }: { config: MovementConfig }) {
                     <span className="font-mono font-semibold">{r.item?.item_code}</span>{' '}
                     <span className="text-slate-500">{r.item?.description}</span>
                   </td>
+                  <td className="text-right">{r.item?.width ?? ''}</td>
+                  <td>{r.item?.width_unit ?? ''}</td>
+                  <td className="text-right">{r.item?.length ?? ''}</td>
+                  <td>{r.item?.length_unit ?? ''}</td>
                   <td className="text-right">{formatQty(r.quantity)}</td>
                   {config.fields.map((f) => (
                     <td key={f.name}>{String(r[f.name] ?? '')}</td>
@@ -153,7 +168,7 @@ export function MovementPage({ config }: { config: MovementConfig }) {
               ))}
               {recent.length === 0 && (
                 <tr>
-                  <td colSpan={4 + config.fields.length} className="text-center text-slate-400 py-6">
+                  <td colSpan={8 + config.fields.length} className="text-center text-slate-400 py-6">
                     No entries yet.
                   </td>
                 </tr>
