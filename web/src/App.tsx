@@ -3,9 +3,10 @@ import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
 import { Layout, NAV } from './components/Layout'
 import { ItemsPage } from './features/items/ItemsPage'
-import { BEGINNING, RECEIVED, WITHDRAW } from './features/movements/configs'
+import { BEGINNING, RECEIVED } from './features/movements/configs'
 import { MovementPage } from './features/movements/MovementPage'
 import { StocksPage } from './features/stocks/StocksPage'
+import { WithdrawPage } from './features/withdraw/WithdrawPage'
 import { supabaseConfigured } from './lib/supabase'
 import { ComingSoon } from './pages/ComingSoon'
 import { LoginPage } from './pages/LoginPage'
@@ -33,7 +34,7 @@ function Gate() {
       <Route element={<Layout />}>
         <Route index element={<StocksPage />} />
         <Route path="beginning" element={<MovementPage key="beginning" config={BEGINNING} />} />
-        <Route path="withdraw" element={<MovementPage key="withdraw" config={WITHDRAW} />} />
+        <Route path="withdraw" element={<WithdrawPage />} />
         <Route path="received" element={<MovementPage key="received" config={RECEIVED} />} />
         <Route path="items" element={isAdmin ? <ItemsPage /> : <Navigate to="/" />} />
         {NAV.filter((n) => n.soon).map((n) => (

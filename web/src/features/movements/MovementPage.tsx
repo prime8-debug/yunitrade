@@ -32,7 +32,7 @@ interface RecentRow {
   [field: string]: unknown
 }
 
-export function MovementPage({ config }: { config: MovementConfig }) {
+export function MovementPage({ config, hideTitle }: { config: MovementConfig; hideTitle?: boolean }) {
   const { isAdmin } = useAuth()
   const [item, setItem] = useState<StockRow | null>(null)
   const [date, setDate] = useState(today)
@@ -118,7 +118,7 @@ export function MovementPage({ config }: { config: MovementConfig }) {
 
   return (
     <div className="space-y-6">
-      <h1 className="page-title">{config.title}</h1>
+      {!hideTitle && <h1 className="page-title">{config.title}</h1>}
 
       <form onSubmit={submit} className="card p-5 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <div>

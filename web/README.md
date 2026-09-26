@@ -7,9 +7,8 @@ stock movement goes through a database function (`post_withdrawal`, etc.).
 ## First-time setup
 
 1. **Create a Supabase project** at https://supabase.com.
-2. **Create the database**: Dashboard → SQL Editor → paste and run, in order:
-   [`../supabase/migrations/0001_inventory_core.sql`](../supabase/migrations/0001_inventory_core.sql), then
-   [`../supabase/migrations/0002_items_uom.sql`](../supabase/migrations/0002_items_uom.sql).
+2. **Create the database**: Dashboard → SQL Editor → paste and run every file in
+   [`../supabase/migrations/`](../supabase/migrations/) **in order** (0001, 0002, 0003, …).
 3. **Create users**: Dashboard → Authentication → Users → *Add user* (email + password,
    tick *Auto confirm*). A `profiles` row is created automatically with role `USER`.
 4. **Make yourself ADMIN** (SQL Editor):
@@ -30,11 +29,14 @@ stock movement goes through a database function (`post_withdrawal`, etc.).
 |---|---|
 | Login | Supabase Auth (email/password) — replaces the PIN |
 | Stocks | Live on-hand per item; click a row for its ledger + running balance |
-| Beginning Inventory / Received / Withdraw | Item autocomplete; saved atomically via RPC; withdraw is stock-checked **server-side** |
+| Beginning Inventory / Received / Withdraw (Roll/PC) | Item autocomplete; saved atomically via RPC; withdraw is stock-checked **server-side** |
+| Withdraw → Yards / Partial sub-tabs | Add a roll with a starting quantity, then withdraw from it; own ledger, kept separate from the main item stock (see assumption below) |
 | Void (ADMIN) | Posts a REVERSAL ledger row; the original stays in history |
-| Items (ADMIN) | Item master add / edit / deactivate |
+| Items (ADMIN) | Item master add / edit / deactivate / delete (blocked if it has history) |
 
-Other menu entries (Sales Orders, Served, 3M Yards, Partial Rolls, Search, Audit) are placeholders.
+Other menu entries (Sales Orders, Served, 3M Yards, Partial Rolls, Search, Audit) are placeholders — note the
+Yards/Partial *withdrawal* workflow already exists under Withdraw; those separate pages would add full roll
+management (edit/close a roll, reports) later.
 
 ## Bulk-loading item codes from the Google Sheet
 
@@ -71,3 +73,8 @@ Received 50, Withdraw 20 → both should show **130** on hand without refreshing
   twice with two different widths (24in and 12in) — that's not possible under this rule. The
   import kept the first row and skipped the second; if both sizes are real stock, give the
   second one its own code (e.g. `STAMARK N450-12`) in the sheet and re-run the import.
+- **3M Yards / Partial Roll withdrawals do not touch the item's main stock.** A roll's
+  remaining Yards/Quantity is tracked in its own ledger (`yards_transactions` /
+  `partial_roll_transactions`). Whether consuming a roll should also reduce the item's
+  ROLLS/PC count in `items` is an open question (plan §44, #23–29) — confirm the rule, then
+  wire the two together.
