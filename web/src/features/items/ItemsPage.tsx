@@ -98,44 +98,44 @@ export function ItemsPage() {
     <div className="space-y-6">
       <h1 className="page-title">Items</h1>
 
-      <form onSubmit={submit} className="card p-5 grid gap-4 md:grid-cols-4">
+      <form onSubmit={submit} className="card p-5 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <label>
           <span className="label">Item Code</span>
-          <input className="input font-mono" required value={form.item_code} onChange={set('item_code')} />
+          <input className="input max-w-xs font-mono" required value={form.item_code} onChange={set('item_code')} />
         </label>
-        <label className="md:col-span-3">
+        <label>
           <span className="label">Description</span>
           <input className="input" value={form.description} onChange={set('description')} />
         </label>
         <label>
           <span className="label">Width</span>
-          <input className="input" type="number" step="any" value={form.width} onChange={set('width')} />
+          <input className="input max-w-xs" type="number" step="any" value={form.width} onChange={set('width')} />
         </label>
         <label>
           <span className="label">Width Unit</span>
-          <input className="input" placeholder="in / mm / m" value={form.width_unit} onChange={set('width_unit')} />
+          <input className="input max-w-xs" placeholder="in / mm / m" value={form.width_unit} onChange={set('width_unit')} />
         </label>
         <label>
           <span className="label">Length</span>
-          <input className="input" type="number" step="any" value={form.length} onChange={set('length')} />
+          <input className="input max-w-xs" type="number" step="any" value={form.length} onChange={set('length')} />
         </label>
         <label>
           <span className="label">Length Unit</span>
-          <input className="input" placeholder="yd / m / ft" value={form.length_unit} onChange={set('length_unit')} />
+          <input className="input max-w-xs" placeholder="yd / m / ft" value={form.length_unit} onChange={set('length_unit')} />
         </label>
         <label>
           <span className="label">Stocking UOM</span>
-          <input className="input" placeholder="ROLLS / PC / SQFT" value={form.uom} onChange={set('uom')} />
+          <input className="input max-w-xs" placeholder="ROLLS / PC / SQFT" value={form.uom} onChange={set('uom')} />
         </label>
         <label>
           <span className="label">Category</span>
-          <input className="input" value={form.category} onChange={set('category')} />
+          <input className="input max-w-xs" value={form.category} onChange={set('category')} />
         </label>
-        <label className="md:col-span-4">
+        <label className="md:col-span-2">
           <span className="label">Remarks</span>
           <input className="input" value={form.remarks} onChange={set('remarks')} />
         </label>
-        <div className="md:col-span-4 flex items-end gap-3">
+        <div className="md:col-span-2 lg:col-span-5 flex items-end gap-3">
           <button className="btn-primary">{editingId ? 'Update Item' : 'Add Item'}</button>
           {editingId && (
             <button
@@ -150,7 +150,7 @@ export function ItemsPage() {
             </button>
           )}
         </div>
-        {message && <p className={`md:col-span-4 text-sm ${message.kind === 'ok' ? 'text-green-700' : 'text-red-600'}`}>{message.text}</p>}
+        {message && <p className={`md:col-span-2 lg:col-span-5 text-sm ${message.kind === 'ok' ? 'text-green-700' : 'text-red-600'}`}>{message.text}</p>}
       </form>
 
       <div>
