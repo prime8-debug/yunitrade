@@ -14,8 +14,9 @@ interface RecentRow {
   entry_date: string
   quantity: number
   voided_at: string | null
-  // The entry's own size (added after some records already existed — those fall
-  // back to the item's default size, shown via the joined `item` below).
+  // The entry's own description/size (added after some records already existed —
+  // those fall back to the item's defaults, shown via the joined `item` below).
+  description: string | null
   width: number | null
   width_unit: string | null
   length: number | null
@@ -38,6 +39,7 @@ export function MovementPage({ config }: { config: MovementConfig }) {
   const [quantity, setQuantity] = useState('')
   const [width, setWidth] = useState('')
   const [length, setLength] = useState('')
+  const [description, setDescription] = useState('')
   const [extra, setExtra] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
@@ -49,6 +51,7 @@ export function MovementPage({ config }: { config: MovementConfig }) {
     setItem(next)
     setWidth(next?.width?.toString() ?? '')
     setLength(next?.length?.toString() ?? '')
+    setDescription(next?.description ?? '')
   }
 
   const loadRecent = useCallback(async () => {
@@ -84,6 +87,7 @@ export function MovementPage({ config }: { config: MovementConfig }) {
       p_width_unit: item.width_unit ?? null,
       p_length: length.trim() === '' ? null : Number(length),
       p_length_unit: item.length_unit ?? null,
+      p_description: description.trim() || null,
     }
     for (const f of config.fields) params[f.param] = extra[f.name]?.trim() || null
 
@@ -113,6 +117,10 @@ export function MovementPage({ config }: { config: MovementConfig }) {
           <span className="label">Item</span>
           <ItemPicker value={item} onChange={pickItem} />
         </div>
+        <label className="md:col-span-2 lg:col-span-4">
+          <span className="label">Description</span>
+          <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} />
+        </label>
         <label>
           <span className="label">Date</span>
           <input className="input max-w-xs" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
@@ -188,7 +196,7 @@ export function MovementPage({ config }: { config: MovementConfig }) {
                     <td className="whitespace-nowrap">{r.entry_date}</td>
                     <td>
                       <span className="font-mono font-semibold">{r.item?.item_code}</span>{' '}
-                      <span className="text-slate-500">{r.item?.description}</span>
+                      <span className="text-slate-500">{r.description ?? r.item?.description}</span>
                     </td>
                     <td className="text-right">{r.width ?? r.item?.width ?? ''}</td>
                     <td>{r.width_unit ?? r.item?.width_unit ?? ''}</td>
