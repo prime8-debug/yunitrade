@@ -44,7 +44,7 @@ export function ItemsCatalog({ editableBeginning }: Props) {
               <th>Size</th>
               <th>UOM</th>
               <th>Category</th>
-              <th className="text-right">Beginning</th>
+              <th className="text-right">{editableBeginning ? 'Quantity' : 'Beginning'}</th>
               <th className="text-right">On Hand</th>
             </tr>
           </thead>
