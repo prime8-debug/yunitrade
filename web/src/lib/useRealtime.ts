@@ -13,6 +13,7 @@ export function useRealtime(tables: string[], onChange: () => void) {
   const key = tables.join(',')
 
   useEffect(() => {
+    if (!key) return
     const channel = supabase.channel(`rt-${key}-${Math.random().toString(36).slice(2)}`)
     for (const table of key.split(',')) {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => cb.current())

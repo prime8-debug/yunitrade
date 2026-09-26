@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { ItemPicker } from '../../components/ItemPicker'
+import { ItemsCatalog } from '../../components/ItemsCatalog'
 import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
 import { formatQty, type StockRow } from '../../lib/types'
@@ -35,18 +36,19 @@ export function MovementPage({ config }: { config: MovementConfig }) {
   const [recent, setRecent] = useState<RecentRow[]>([])
 
   const loadRecent = useCallback(async () => {
+    if (config.showCatalog) return
     const { data } = await supabase
       .from(config.table)
       .select('*, item:items(item_code, description, width, width_unit, length, length_unit)')
       .order('created_at', { ascending: false })
       .limit(50)
     setRecent((data as RecentRow[]) ?? [])
-  }, [config.table])
+  }, [config.table, config.showCatalog])
 
   useEffect(() => {
     loadRecent()
   }, [loadRecent])
-  useRealtime([config.table], loadRecent)
+  useRealtime(config.showCatalog ? [] : [config.table], loadRecent)
 
   const qty = Number(quantity)
   const overStock = config.checksStock && item != null && qty > Number(item.on_hand)
@@ -118,65 +120,72 @@ export function MovementPage({ config }: { config: MovementConfig }) {
         </div>
       </form>
 
-      <div>
-        <h2 className="font-semibold text-slate-700 mb-2">Recent entries</h2>
-        <div className="card overflow-x-auto">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Item</th>
-                <th className="text-right">W</th>
-                <th>W-UM</th>
-                <th className="text-right">L</th>
-                <th>L-UM</th>
-                <th className="text-right">Qty</th>
-                {config.fields.map((f) => (
-                  <th key={f.name}>{f.label}</th>
-                ))}
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {recent.map((r) => (
-                <tr key={r.id} className={r.voided_at ? 'opacity-50 line-through' : ''}>
-                  <td className="whitespace-nowrap">{r.entry_date}</td>
-                  <td>
-                    <span className="font-mono font-semibold">{r.item?.item_code}</span>{' '}
-                    <span className="text-slate-500">{r.item?.description}</span>
-                  </td>
-                  <td className="text-right">{r.item?.width ?? ''}</td>
-                  <td>{r.item?.width_unit ?? ''}</td>
-                  <td className="text-right">{r.item?.length ?? ''}</td>
-                  <td>{r.item?.length_unit ?? ''}</td>
-                  <td className="text-right">{formatQty(r.quantity)}</td>
-                  {config.fields.map((f) => (
-                    <td key={f.name}>{String(r[f.name] ?? '')}</td>
-                  ))}
-                  <td className="text-right whitespace-nowrap no-underline">
-                    {r.voided_at ? (
-                      <span className="badge">VOID</span>
-                    ) : (
-                      isAdmin && (
-                        <button className="text-xs text-red-600 underline" onClick={() => voidEntry(r)}>
-                          Void
-                        </button>
-                      )
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {recent.length === 0 && (
-                <tr>
-                  <td colSpan={8 + config.fields.length} className="text-center text-slate-400 py-6">
-                    No entries yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      {config.showCatalog ? (
+        <div>
+          <h2 className="font-semibold text-slate-700 mb-2">Items</h2>
+          <ItemsCatalog />
         </div>
-      </div>
+      ) : (
+        <div>
+          <h2 className="font-semibold text-slate-700 mb-2">Recent entries</h2>
+          <div className="card overflow-x-auto">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Item</th>
+                  <th className="text-right">W</th>
+                  <th>W-UM</th>
+                  <th className="text-right">L</th>
+                  <th>L-UM</th>
+                  <th className="text-right">Qty</th>
+                  {config.fields.map((f) => (
+                    <th key={f.name}>{f.label}</th>
+                  ))}
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {recent.map((r) => (
+                  <tr key={r.id} className={r.voided_at ? 'opacity-50 line-through' : ''}>
+                    <td className="whitespace-nowrap">{r.entry_date}</td>
+                    <td>
+                      <span className="font-mono font-semibold">{r.item?.item_code}</span>{' '}
+                      <span className="text-slate-500">{r.item?.description}</span>
+                    </td>
+                    <td className="text-right">{r.item?.width ?? ''}</td>
+                    <td>{r.item?.width_unit ?? ''}</td>
+                    <td className="text-right">{r.item?.length ?? ''}</td>
+                    <td>{r.item?.length_unit ?? ''}</td>
+                    <td className="text-right">{formatQty(r.quantity)}</td>
+                    {config.fields.map((f) => (
+                      <td key={f.name}>{String(r[f.name] ?? '')}</td>
+                    ))}
+                    <td className="text-right whitespace-nowrap no-underline">
+                      {r.voided_at ? (
+                        <span className="badge">VOID</span>
+                      ) : (
+                        isAdmin && (
+                          <button className="text-xs text-red-600 underline" onClick={() => voidEntry(r)}>
+                            Void
+                          </button>
+                        )
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {recent.length === 0 && (
+                  <tr>
+                    <td colSpan={8 + config.fields.length} className="text-center text-slate-400 py-6">
+                      No entries yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

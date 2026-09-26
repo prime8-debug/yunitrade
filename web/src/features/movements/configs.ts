@@ -14,6 +14,8 @@ export interface MovementConfig {
   /** warn in the UI before the server rejects it */
   checksStock: boolean
   fields: MovementField[]
+  /** Show the full item catalog (with filter) instead of a Recent entries / void list below the form. */
+  showCatalog?: boolean
 }
 
 export const BEGINNING: MovementConfig = {
@@ -22,6 +24,7 @@ export const BEGINNING: MovementConfig = {
   rpc: 'post_beginning',
   checksStock: false,
   fields: [{ name: 'notes', param: 'p_notes', label: 'Notes', wide: true }],
+  showCatalog: true,
 }
 
 export const RECEIVED: MovementConfig = {
