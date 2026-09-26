@@ -123,7 +123,8 @@ export function MovementPage({ config }: { config: MovementConfig }) {
       {config.showCatalog ? (
         <div>
           <h2 className="font-semibold text-slate-700 mb-2">Items</h2>
-          <ItemsCatalog />
+          <p className="text-xs text-slate-400 mb-2">Type a Beginning quantity directly in the table — press Enter or click away to save.</p>
+          <ItemsCatalog editableBeginning={config.table === 'beginning_inventory'} />
         </div>
       ) : (
         <div>
