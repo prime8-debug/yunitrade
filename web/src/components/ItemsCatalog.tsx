@@ -86,23 +86,34 @@ function BeginningRow({ item }: { item: StockRow }) {
     setError(null)
     const next = Number(raw)
     if (raw.trim() === '' || !Number.isFinite(next) || next < 0) return revert()
-    const delta = next - Number(item.beginning)
-    if (delta === 0) return
-
-    // The ledger is append-only: we can only ever ADD a Beginning entry, never
-    // rewrite one. Raising the number posts the difference; lowering it needs
-    // an ADMIN to void the original entry first, so it's refused here.
-    if (delta < 0) {
-      setError(`Can't lower below ${formatQty(item.beginning)} here — an ADMIN must void the existing entry first.`)
-      return revert()
-    }
+    const current = Number(item.beginning)
+    if (next === current) return
 
     setSaving(true)
-    const { error } = await supabase.rpc('post_beginning', {
-      p_item_id: item.item_id,
-      p_quantity: delta,
-      p_notes: 'Set via item catalog (Beginning tab)',
-    })
+    // Nothing set yet: a plain first-time Beginning entry, no reason needed.
+    // Already has a balance: any change (up OR down) is now a reason-required
+    // Adjustment — never a silent overwrite of the posted entry.
+    const { error } =
+      current === 0
+        ? await supabase.rpc('post_beginning', {
+            p_item_id: item.item_id,
+            p_quantity: next,
+            p_notes: 'Set via item catalog (Beginning tab)',
+          })
+        : await (async () => {
+            const reason = window.prompt(
+              `Adjusting Beginning Inventory for ${item.item_code}\n${formatQty(current)} → ${formatQty(next)}\n\nReason (required):`,
+            )
+            if (reason === null || reason.trim() === '') {
+              revert()
+              return { error: null }
+            }
+            return supabase.rpc('post_beginning_adjustment', {
+              p_item_id: item.item_id,
+              p_new_quantity: next,
+              p_reason: reason.trim(),
+            })
+          })()
     setSaving(false)
     if (error) {
       setError(errorMessage(error))

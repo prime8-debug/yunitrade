@@ -29,7 +29,8 @@ stock movement goes through a database function (`post_withdrawal`, etc.).
 |---|---|
 | Login | Supabase Auth (email/password) — replaces the PIN |
 | Stocks | Live on-hand per item; click a row for its ledger + running balance |
-| Beginning Inventory / Received / Withdraw (Roll/PC) | Item autocomplete; saved atomically via RPC; withdraw is stock-checked **server-side** |
+| Beginning Inventory (ADMIN only) | First entry per item via the form/inline box; changing an already-set balance is a reason-required **Adjustment**, logged below the item list — never a silent overwrite |
+| Received / Withdraw (Roll/PC) | Item autocomplete; saved atomically via RPC; withdraw is stock-checked **server-side** |
 | Withdraw → Yards / Partial sub-tabs | Add a roll with a starting quantity, then withdraw from it; own ledger, kept separate from the main item stock (see assumption below) |
 | Void (ADMIN) | Posts a REVERSAL ledger row; the original stays in history |
 | Items (ADMIN) | Item master add / edit / deactivate / delete (blocked if it has history) |
@@ -68,7 +69,7 @@ Received 50, Withdraw 20 → both should show **130** on hand without refreshing
 - Item code is unique (case-insensitive).
 - Negative stock is **not** allowed.
 - Quantities may be decimals.
-- Only ADMIN can void; USER can post Beginning / Received / Withdraw.
+- Only ADMIN can void, or set/adjust Beginning Inventory; USER can post Received / Withdraw.
 - One item code = one fixed width/length/UOM. The real sheet has **`STAMARK N450`** listed
   twice with two different widths (24in and 12in) — that's not possible under this rule. The
   import kept the first row and skipped the second; if both sizes are real stock, give the

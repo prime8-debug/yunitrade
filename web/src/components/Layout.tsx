@@ -12,7 +12,7 @@ interface NavEntry {
 // Navigation from the concept plan (§6). `soon` = later phase, not built yet.
 export const NAV: NavEntry[] = [
   { to: '/', label: 'Stocks' },
-  { to: '/beginning', label: 'Beginning Inventory' },
+  { to: '/beginning', label: 'Beginning Inventory', adminOnly: true },
   { to: '/withdraw', label: 'Withdraw' },
   { to: '/received', label: 'Received' },
   { to: '/sales-orders', label: 'Sales Orders', soon: true },

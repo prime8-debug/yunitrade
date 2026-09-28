@@ -33,7 +33,7 @@ function Gate() {
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<StocksPage />} />
-        <Route path="beginning" element={<MovementPage key="beginning" config={BEGINNING} />} />
+        <Route path="beginning" element={isAdmin ? <MovementPage key="beginning" config={BEGINNING} /> : <Navigate to="/" />} />
         <Route path="withdraw" element={<WithdrawPage />} />
         <Route path="received" element={<MovementPage key="received" config={RECEIVED} />} />
         <Route path="items" element={isAdmin ? <ItemsPage /> : <Navigate to="/" />} />

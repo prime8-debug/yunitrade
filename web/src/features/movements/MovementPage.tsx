@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { ItemPicker } from '../../components/ItemPicker'
 import { ItemsCatalog } from '../../components/ItemsCatalog'
+import { BeginningAdjustmentLog } from './BeginningAdjustmentLog'
 import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
 import { formatQty, type StockRow } from '../../lib/types'
@@ -176,10 +177,16 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
       </form>
 
       {config.showCatalog ? (
-        <div>
-          <h2 className="font-semibold text-slate-700 mb-2">Items</h2>
-          <p className="text-xs text-slate-400 mb-2">Type a Beginning quantity directly in the table — press Enter or click away to save.</p>
-          <ItemsCatalog editableBeginning={config.table === 'beginning_inventory'} />
+        <div className="space-y-6">
+          <div>
+            <h2 className="font-semibold text-slate-700 mb-2">Items</h2>
+            <p className="text-xs text-slate-400 mb-2">
+              Type a Beginning quantity directly in the table — press Enter or click away to save. Changing an already-set balance
+              requires a reason and is logged below.
+            </p>
+            <ItemsCatalog editableBeginning={config.table === 'beginning_inventory'} />
+          </div>
+          <BeginningAdjustmentLog />
         </div>
       ) : (
         <div>
