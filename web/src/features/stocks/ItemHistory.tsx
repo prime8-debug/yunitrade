@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
-import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../auth/AuthProvider'
+import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
 import { formatQty, type LedgerRow, type StockRow } from '../../lib/types'
 
 /** Ledger for one item, with a running balance: "why is stock what it is?" */
 export function ItemHistory({ item, onClose }: { item: StockRow; onClose: () => void }) {
+  const { isAdmin } = useAuth()
   const [rows, setRows] = useState<LedgerRow[]>([])
+  const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const { data } = await supabase
@@ -28,6 +31,18 @@ export function ItemHistory({ item, onClose }: { item: StockRow; onClose: () => 
     return acc
   }, [])
 
+  // A row that's already been voided has a later REVERSAL row pointing back at it.
+  const voidedIds = new Set(rows.map((r) => r.reversal_of).filter((id): id is string => id != null))
+
+  async function voidRow(r: LedgerRow) {
+    if (!r.reference_type || !r.reference_id) return
+    const reason = window.prompt(`Void this ${r.transaction_type} entry (${r.transaction_date}, qty ${formatQty(r.quantity)})?\nReason:`)
+    if (reason === null) return
+    setError(null)
+    const { error } = await supabase.rpc('void_entry', { p_reference_type: r.reference_type, p_reference_id: r.reference_id, p_reason: reason || null })
+    if (error) setError(errorMessage(error))
+  }
+
   return (
     <div className="fixed inset-0 z-20 flex justify-end bg-black/30" onClick={onClose}>
       <div className="h-full w-full max-w-2xl overflow-auto bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -40,6 +55,7 @@ export function ItemHistory({ item, onClose }: { item: StockRow; onClose: () => 
             Close
           </button>
         </div>
+        {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
         <table className="table">
           <thead>
             <tr>
@@ -48,11 +64,12 @@ export function ItemHistory({ item, onClose }: { item: StockRow; onClose: () => 
               <th>Remarks</th>
               <th className="text-right">Qty</th>
               <th className="text-right">Balance</th>
+              <th />
             </tr>
           </thead>
           <tbody>
             {withBalance.map((r) => (
-              <tr key={r.id}>
+              <tr key={r.id} className={voidedIds.has(r.id) ? 'opacity-50 line-through' : ''}>
                 <td className="whitespace-nowrap">{r.transaction_date}</td>
                 <td>
                   <span className="badge">{r.transaction_type}</span>
@@ -63,11 +80,18 @@ export function ItemHistory({ item, onClose }: { item: StockRow; onClose: () => 
                   {formatQty(r.quantity)}
                 </td>
                 <td className="text-right font-semibold">{formatQty(r.balance)}</td>
+                <td className="text-right whitespace-nowrap no-underline">
+                  {isAdmin && r.reference_type && r.reference_id && r.transaction_type !== 'REVERSAL' && !voidedIds.has(r.id) && (
+                    <button className="text-xs text-red-600 underline" onClick={() => voidRow(r)}>
+                      Void
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
             {withBalance.length === 0 && (
               <tr>
-                <td colSpan={5} className="text-center text-slate-400 py-6">
+                <td colSpan={6} className="text-center text-slate-400 py-6">
                   No movements yet.
                 </td>
               </tr>
