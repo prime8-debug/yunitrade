@@ -5,6 +5,8 @@ import { formatQty, type StockRow } from '../lib/types'
 interface Props {
   value: StockRow | null
   onChange: (item: StockRow | null) => void
+  /** Override the unit shown next to on-hand (e.g. "roll" in Split & Withdraw), instead of the item's stocking UOM. */
+  unitLabel?: string
 }
 
 /**
@@ -12,7 +14,7 @@ interface Props {
  * Picking an item (click, or typing the exact code and pressing Enter) fills
  * its Description/Width/Length/UOM back into the form automatically.
  */
-export function ItemPicker({ value, onChange }: Props) {
+export function ItemPicker({ value, onChange, unitLabel }: Props) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<StockRow[]>([])
   const [open, setOpen] = useState(false)
@@ -58,7 +60,8 @@ export function ItemPicker({ value, onChange }: Props) {
         <div className="text-right">
           <div className="text-xs text-slate-500">On hand</div>
           <div className="font-semibold">
-            {formatQty(value.on_hand)} {value.uom && <span className="text-xs font-normal text-slate-500">{value.uom}</span>}
+            {formatQty(value.on_hand)}{' '}
+            {(unitLabel ?? value.uom) && <span className="text-xs font-normal text-slate-500">{unitLabel ?? value.uom}</span>}
           </div>
         </div>
         <button type="button" className="ml-3 text-sm text-blue-600 underline" onClick={() => onChange(null)}>
@@ -110,7 +113,7 @@ export function ItemPicker({ value, onChange }: Props) {
                   <span className="text-sm text-slate-500">{r.description}</span>
                 </span>
                 <span className="text-sm text-slate-600 whitespace-nowrap">
-                  {formatQty(r.on_hand)} {r.uom}
+                  {formatQty(r.on_hand)} {unitLabel ?? r.uom}
                 </span>
               </button>
             </li>

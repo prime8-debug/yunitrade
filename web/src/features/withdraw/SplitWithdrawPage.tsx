@@ -96,7 +96,7 @@ export function SplitWithdrawPage() {
     if (yieldPerSource == null) return setMessage({ kind: 'error', text: 'The source width must divide evenly into the output width, using the same width unit.' })
     if (!(sourceCount > 0) || !Number.isInteger(sourceCount)) return setMessage({ kind: 'error', text: 'Source quantity must be a whole number of source rolls.' })
     if (!(customerCount > 0) || !Number.isInteger(customerCount)) return setMessage({ kind: 'error', text: 'Customer quantity must be a whole number of output rolls.' })
-    if (overSourceStock) return setMessage({ kind: 'error', text: `Only ${formatQty(source.on_hand)} ${source.uom ?? ''} of the source item is on hand.` })
+    if (overSourceStock) return setMessage({ kind: 'error', text: `Only ${formatQty(source.on_hand)} roll of the source item is on hand.` })
     if (invalidCustomerQty) return setMessage({ kind: 'error', text: `This split produces ${formatQty(produced)} output rolls, but the customer needs ${formatQty(customerCount)}.` })
 
     setBusy(true)
@@ -147,11 +147,11 @@ export function SplitWithdrawPage() {
         <div className="grid gap-4 lg:grid-cols-2">
           <div>
             <span className="label">Source stock</span>
-            <ItemPicker value={source} onChange={setSource} />
+            <ItemPicker value={source} onChange={setSource} unitLabel="roll" />
           </div>
           <div>
             <span className="label">Output / customer size</span>
-            <ItemPicker value={output} onChange={setOutput} />
+            <ItemPicker value={output} onChange={setOutput} unitLabel="roll" />
           </div>
         </div>
 
@@ -160,7 +160,7 @@ export function SplitWithdrawPage() {
             <div><div className="text-xs text-slate-500">Source</div><div className="font-semibold">{formatSize(source)}</div></div>
             <div><div className="text-xs text-slate-500">Output</div><div className="font-semibold">{formatSize(output)}</div></div>
             <div><div className="text-xs text-slate-500">Pieces per source roll</div><div className="font-semibold">{yieldPerSource ?? 'Cannot calculate'}</div></div>
-            <div><div className="text-xs text-slate-500">Source on hand</div><div className="font-semibold">{formatQty(source.on_hand)} {source.uom}</div></div>
+            <div><div className="text-xs text-slate-500">Source on hand</div><div className="font-semibold">{formatQty(source.on_hand)} roll</div></div>
           </div>
         )}
 
