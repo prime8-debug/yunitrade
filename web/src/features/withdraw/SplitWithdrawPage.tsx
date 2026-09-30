@@ -221,8 +221,8 @@ export function SplitWithdrawPage() {
         )}
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <label><span className="label">Source rolls to use {yieldPerSource && <span className="text-slate-400 font-normal">(auto from customer rolls)</span>}</span><input className={`input ${overSourceStock ? 'border-red-500' : ''}`} type="number" min="1" step="1" value={sourceQty} onChange={e => setSourceQty(e.target.value)} />{overSourceStock && <span className="text-xs text-red-600">More than source stock.</span>}</label>
           <label><span className="label">Customer rolls needed</span><input className={`input ${invalidCustomerQty ? 'border-red-500' : ''}`} type="number" min="1" step="1" value={customerQty} onChange={e => setCustomerQty(e.target.value)} /></label>
+          <label><span className="label">Source rolls to use {yieldPerSource && <span className="text-slate-400 font-normal">(auto from customer rolls)</span>}</span><input className={`input ${overSourceStock ? 'border-red-500' : ''}`} type="number" min="1" step="1" value={sourceQty} onChange={e => setSourceQty(e.target.value)} />{overSourceStock && <span className="text-xs text-red-600">More than source stock.</span>}</label>
           <label><span className="label">Date</span><input className="input" type="date" required value={date} onChange={e => setDate(e.target.value)} /></label>
           <label><span className="label">Customer</span><input className="input" value={customer} onChange={e => setCustomer(e.target.value)} /></label>
           <label><span className="label">Withdrawal No.</span><input className="input" value={withdrawalNo} onChange={e => setWithdrawalNo(e.target.value)} /></label>
