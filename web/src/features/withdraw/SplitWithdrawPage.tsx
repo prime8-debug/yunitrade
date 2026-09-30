@@ -95,8 +95,16 @@ export function SplitWithdrawPage() {
   }, [source])
 
   const yieldPerSource = useMemo(() => splitYield(source, output), [source, output])
-  const sourceCount = Number(sourceQty)
   const customerCount = Number(customerQty)
+
+  // Source rolls needed = enough to produce at least the customer's quantity,
+  // e.g. yield 2: 2 customer rolls -> 1 source, 3 -> 2 (rounds up), 4 -> 2, 6 -> 3.
+  useEffect(() => {
+    if (!yieldPerSource || yieldPerSource <= 0 || !(customerCount > 0)) return
+    setSourceQty(String(Math.ceil(customerCount / yieldPerSource)))
+  }, [customerCount, yieldPerSource])
+
+  const sourceCount = Number(sourceQty)
   const produced = yieldPerSource != null && sourceCount > 0 ? sourceCount * yieldPerSource : 0
   const stockRemainder = produced > 0 && customerCount > 0 ? produced - customerCount : 0
   const invalidCustomerQty = customerCount <= 0 || (produced > 0 && customerCount > produced)
@@ -213,7 +221,7 @@ export function SplitWithdrawPage() {
         )}
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <label><span className="label">Source rolls to use</span><input className={`input ${overSourceStock ? 'border-red-500' : ''}`} type="number" min="1" step="1" value={sourceQty} onChange={e => setSourceQty(e.target.value)} />{overSourceStock && <span className="text-xs text-red-600">More than source stock.</span>}</label>
+          <label><span className="label">Source rolls to use {yieldPerSource && <span className="text-slate-400 font-normal">(auto from customer rolls)</span>}</span><input className={`input ${overSourceStock ? 'border-red-500' : ''}`} type="number" min="1" step="1" value={sourceQty} onChange={e => setSourceQty(e.target.value)} />{overSourceStock && <span className="text-xs text-red-600">More than source stock.</span>}</label>
           <label><span className="label">Customer rolls needed</span><input className={`input ${invalidCustomerQty ? 'border-red-500' : ''}`} type="number" min="1" step="1" value={customerQty} onChange={e => setCustomerQty(e.target.value)} /></label>
           <label><span className="label">Date</span><input className="input" type="date" required value={date} onChange={e => setDate(e.target.value)} /></label>
           <label><span className="label">Customer</span><input className="input" value={customer} onChange={e => setCustomer(e.target.value)} /></label>
