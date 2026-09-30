@@ -32,16 +32,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(null)
       return
     }
-    setLoading(true)
+    // Supabase refreshes the session in the background (including when the tab
+    // regains focus after being backgrounded), which re-fires this effect with a
+    // new session object for the SAME user. Deliberately not calling setLoading(true)
+    // here: doing so would flash the full-page loader and unmount every page below
+    // it — resetting things like WithdrawPage's selected sub-tab — for a refresh
+    // that doesn't need to block anything. Only the very first load (loading starts
+    // true) shows the loader; this just keeps the profile fresh in the background.
+    let cancelled = false
     supabase
       .from('profiles')
       .select('id, email, display_name, role, active')
       .eq('id', session.user.id)
       .single()
       .then(({ data }) => {
+        if (cancelled) return
         setProfile(data as Profile | null)
         setLoading(false)
       })
+    return () => {
+      cancelled = true
+    }
   }, [session])
 
   const value: AuthState = {
