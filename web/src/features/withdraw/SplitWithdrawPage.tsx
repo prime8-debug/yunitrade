@@ -40,6 +40,17 @@ function operationSize(item: OperationRow['source'] | null): string {
   return [w, l].filter(Boolean).join(' × ') || '—'
 }
 
+// Item codes in the catalog come in same-product pairs that only differ by their
+// trailing width, e.g. "1170-ECF-CLEAR-48" / "1170-ECF-CLEAR-24". Splitting a wider
+// roll almost always means producing the 24"-wide sibling, so derive it automatically
+// instead of making the user search for it every time.
+function deriveOutputCode(sourceCode: string): string | null {
+  const m = sourceCode.match(/^(.*)-\d+$/)
+  if (!m) return null
+  const candidate = `${m[1]}-24`
+  return candidate.toUpperCase() === sourceCode.toUpperCase() ? null : candidate
+}
+
 export function SplitWithdrawPage() {
   const { isAdmin } = useAuth()
   const [source, setSource] = useState<StockRow | null>(null)
@@ -54,6 +65,34 @@ export function SplitWithdrawPage() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
   const [recent, setRecent] = useState<OperationRow[]>([])
+  const [outputAuto, setOutputAuto] = useState(false)
+
+  // Auto-fill Output from Source's 24"-wide sibling code. A manual pick (via
+  // the picker's own "Change" link) sticks until Source changes again.
+  useEffect(() => {
+    setOutput(null)
+    setOutputAuto(false)
+    if (!source) return
+    const code = deriveOutputCode(source.item_code)
+    if (!code) return
+    let cancelled = false
+    supabase
+      .from('current_stock')
+      .select('*')
+      .eq('active', true)
+      .ilike('item_code', code)
+      .then(({ data }) => {
+        if (cancelled) return
+        const match = (data as StockRow[] | null)?.find((r) => r.item_code.toUpperCase() === code.toUpperCase())
+        if (match) {
+          setOutput(match)
+          setOutputAuto(true)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [source])
 
   const yieldPerSource = useMemo(() => splitYield(source, output), [source, output])
   const sourceCount = Number(sourceQty)
@@ -150,8 +189,17 @@ export function SplitWithdrawPage() {
             <ItemPicker value={source} onChange={setSource} unitLabel="roll" />
           </div>
           <div>
-            <span className="label">Output / customer size</span>
-            <ItemPicker value={output} onChange={setOutput} unitLabel="roll" />
+            <span className="label">
+              Output / customer size {outputAuto && <span className="text-slate-400 font-normal">(auto from source — click Change to override)</span>}
+            </span>
+            <ItemPicker
+              value={output}
+              onChange={(v) => {
+                setOutput(v)
+                setOutputAuto(false)
+              }}
+              unitLabel="roll"
+            />
           </div>
         </div>
 
