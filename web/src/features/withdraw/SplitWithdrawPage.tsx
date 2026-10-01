@@ -65,6 +65,7 @@ export function SplitWithdrawPage() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
   const [recent, setRecent] = useState<OperationRow[]>([])
+  const [recentQuery, setRecentQuery] = useState('')
   const [outputAuto, setOutputAuto] = useState(false)
 
   // Auto-fill Output from Source's 24"-wide sibling code. A manual pick (via
@@ -121,6 +122,17 @@ export function SplitWithdrawPage() {
 
   useEffect(() => { loadRecent() }, [loadRecent])
   useRealtime(['inventory_operations', 'inventory_transactions', 'items'], loadRecent)
+
+  const visibleRecent = recentQuery.trim()
+    ? recent.filter((row) => {
+        const q = recentQuery.trim().toLowerCase()
+        const haystack = [row.operation_no, row.source?.item_code, row.source?.description, row.output?.item_code, row.output?.description, row.customer, row.withdrawal_no, row.remarks]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        return haystack.includes(q)
+      })
+    : recent
 
   function clear() {
     setSource(null)
@@ -251,11 +263,19 @@ export function SplitWithdrawPage() {
 
       <div>
         <h3 className="font-semibold text-slate-700 mb-2">Recent split operations</h3>
+        <input
+          className="input w-64 mb-2"
+          placeholder="Filter by operation, item, customer…"
+          value={recentQuery}
+          onChange={(e) => setRecentQuery(e.target.value)}
+        />
         <div className="card overflow-x-auto">
           <table className="table">
             <thead><tr><th>Date</th><th>Operation</th><th>Source</th><th>Output</th><th className="text-right">Source Qty</th><th className="text-right">Customer</th><th className="text-right">Stock Remainder</th><th>Status</th>{isAdmin && <th />}</tr></thead>
             <tbody>
-              {recent.length === 0 ? <tr><td colSpan={isAdmin ? 9 : 8} className="text-slate-400">No split operations yet.</td></tr> : recent.map(row => (
+              {visibleRecent.length === 0 ? (
+                <tr><td colSpan={isAdmin ? 9 : 8} className="text-slate-400">{recent.length === 0 ? 'No split operations yet.' : 'No operations match that filter.'}</td></tr>
+              ) : visibleRecent.map(row => (
                 <tr key={row.id}>
                   <td>{row.entry_date}</td><td className="font-mono">{row.operation_no}</td>
                   <td><b>{row.source?.item_code ?? '—'}</b><br /><span className="text-xs text-slate-500">{operationSize(row.source)}</span></td>

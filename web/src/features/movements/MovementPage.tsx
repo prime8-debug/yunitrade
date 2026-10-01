@@ -45,6 +45,7 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
   const [recent, setRecent] = useState<RecentRow[]>([])
+  const [recentQuery, setRecentQuery] = useState('')
 
   // Selecting an item defaults Width/Length to its usual size — still editable
   // per entry (e.g. a custom-cut length shorter than the full roll).
@@ -72,6 +73,17 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
 
   const qty = Number(quantity)
   const overStock = config.checksStock && item != null && qty > Number(item.on_hand)
+
+  const visibleRecent = recentQuery.trim()
+    ? recent.filter((r) => {
+        const q = recentQuery.trim().toLowerCase()
+        const haystack = [r.item?.item_code, r.item?.description, r.description, ...config.fields.map((f) => r[f.name])]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        return haystack.includes(q)
+      })
+    : recent
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -191,6 +203,12 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
       ) : (
         <div>
           <h2 className="font-semibold text-slate-700 mb-2">Recent entries</h2>
+          <input
+            className="input w-64 mb-2"
+            placeholder="Filter by item, code, customer…"
+            value={recentQuery}
+            onChange={(e) => setRecentQuery(e.target.value)}
+          />
           <div className="card overflow-x-auto">
             <table className="table">
               <thead>
@@ -209,7 +227,7 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
                 </tr>
               </thead>
               <tbody>
-                {recent.map((r) => (
+                {visibleRecent.map((r) => (
                   <tr key={r.id} className={r.voided_at ? 'opacity-50 line-through' : ''}>
                     <td className="whitespace-nowrap">{r.entry_date}</td>
                     <td>
@@ -237,10 +255,10 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
                     </td>
                   </tr>
                 ))}
-                {recent.length === 0 && (
+                {visibleRecent.length === 0 && (
                   <tr>
                     <td colSpan={8 + config.fields.length} className="text-center text-slate-400 py-6">
-                      No entries yet.
+                      {recent.length === 0 ? 'No entries yet.' : 'No entries match that filter.'}
                     </td>
                   </tr>
                 )}

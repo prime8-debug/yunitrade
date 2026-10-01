@@ -27,6 +27,7 @@ interface RollRow {
 export function RollLedgerPanel({ config }: { config: RollLedgerConfig }) {
   const [rolls, setRolls] = useState<RollRow[]>([])
   const [rollQuery, setRollQuery] = useState('')
+  const [listQuery, setListQuery] = useState('')
 
   // Create-roll form
   const [newItem, setNewItem] = useState<StockRow | null>(null)
@@ -63,6 +64,13 @@ export function RollLedgerPanel({ config }: { config: RollLedgerConfig }) {
           r.item_code.toLowerCase().includes(rollQuery.trim().toLowerCase()) ||
           (r.roll_no ?? '').toLowerCase().includes(rollQuery.trim().toLowerCase()),
       )
+    : rolls
+
+  const visibleRolls = listQuery.trim()
+    ? rolls.filter((r) => {
+        const q = listQuery.trim().toLowerCase()
+        return [r.item_code, r.description, r.roll_no].filter(Boolean).join(' ').toLowerCase().includes(q)
+      })
     : rolls
 
   async function createRoll(e: React.FormEvent) {
@@ -244,6 +252,12 @@ export function RollLedgerPanel({ config }: { config: RollLedgerConfig }) {
 
       <div>
         <h2 className="font-semibold text-slate-700 mb-2">{config.title} Rolls</h2>
+        <input
+          className="input w-64 mb-2"
+          placeholder="Filter by item code, description, roll no…"
+          value={listQuery}
+          onChange={(e) => setListQuery(e.target.value)}
+        />
         <div className="card overflow-x-auto">
           <table className="table">
             <thead>
@@ -256,7 +270,7 @@ export function RollLedgerPanel({ config }: { config: RollLedgerConfig }) {
               </tr>
             </thead>
             <tbody>
-              {rolls.map((r) => (
+              {visibleRolls.map((r) => (
                 <tr key={r.roll_id}>
                   <td className="font-mono font-semibold">{r.item_code}</td>
                   <td>{r.description}</td>
@@ -265,10 +279,10 @@ export function RollLedgerPanel({ config }: { config: RollLedgerConfig }) {
                   <td className={`text-right font-semibold ${remaining(r) <= 0 ? 'text-red-600' : ''}`}>{formatQty(remaining(r))}</td>
                 </tr>
               ))}
-              {rolls.length === 0 && (
+              {visibleRolls.length === 0 && (
                 <tr>
                   <td colSpan={5} className="text-center text-slate-400 py-6">
-                    No rolls yet — add one above.
+                    {rolls.length === 0 ? 'No rolls yet — add one above.' : 'No rolls match that filter.'}
                   </td>
                 </tr>
               )}
