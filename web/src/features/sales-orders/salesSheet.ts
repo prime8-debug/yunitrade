@@ -11,6 +11,7 @@ export interface OrderRow {
   length: string
   lengthUnit: string
   itemId: string
+  itemDescription: string
 }
 
 /**
@@ -40,6 +41,7 @@ export function toOrders(text: string): OrderRow[] {
     length: findColumn(headers, 'LENGTH'),
     lengthUnit: findColumn(headers, 'Unit (L)'),
     itemId: findColumn(headers, 'Item ID'),
+    itemDescription: findColumn(headers, 'Item Description'),
   }
   const cell = (r: string[], i: number) => (r[i] ?? '').trim()
 
@@ -59,6 +61,7 @@ export function toOrders(text: string): OrderRow[] {
       length: cell(r, idx.length),
       lengthUnit: cell(r, idx.lengthUnit),
       itemId: cell(r, idx.itemId),
+      itemDescription: cell(r, idx.itemDescription),
     })
   })
   // Newest first; rows on the same date keep "added later in the sheet = higher up".

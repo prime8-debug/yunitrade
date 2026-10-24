@@ -53,7 +53,7 @@ export function SalesOrdersPage() {
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return orders
-    return orders.filter((o) => [o.date, o.jobOrder, o.customer, o.itemId].join(' ').toLowerCase().includes(q))
+    return orders.filter((o) => [o.date, o.jobOrder, o.customer, o.itemId, o.itemDescription].join(' ').toLowerCase().includes(q))
   }, [orders, query])
 
   async function saveUrl(e: FormEvent) {
@@ -136,6 +136,7 @@ export function SalesOrdersPage() {
               <tr>
                 <th>Date</th>
                 <th>Item ID</th>
+                <th>Item Description</th>
                 <th className="text-right">Quantity</th>
                 <th className="text-right">Width</th>
                 <th>Unit (W)</th>
@@ -150,6 +151,7 @@ export function SalesOrdersPage() {
                 <tr key={o.key}>
                   <td className="whitespace-nowrap">{o.date}</td>
                   <td className="font-mono whitespace-nowrap">{o.itemId}</td>
+                  <td>{o.itemDescription}</td>
                   <td className="text-right">{o.quantity && !isNaN(Number(o.quantity)) ? formatQty(Number(o.quantity)) : o.quantity}</td>
                   <td className="text-right">{o.width}</td>
                   <td>{o.widthUnit}</td>
@@ -161,7 +163,7 @@ export function SalesOrdersPage() {
               ))}
               {visible.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="text-center text-slate-400 py-6">
+                  <td colSpan={10} className="text-center text-slate-400 py-6">
                     {loading ? 'Loading…' : orders.length === 0 ? 'No orders in the sheet.' : 'No orders match that filter.'}
                   </td>
                 </tr>
