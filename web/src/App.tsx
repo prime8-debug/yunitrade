@@ -5,6 +5,7 @@ import { Layout, NAV } from './components/Layout'
 import { ItemsPage } from './features/items/ItemsPage'
 import { BEGINNING, RECEIVED } from './features/movements/configs'
 import { MovementPage } from './features/movements/MovementPage'
+import { SalesOrdersPage } from './features/sales-orders/SalesOrdersPage'
 import { StocksPage } from './features/stocks/StocksPage'
 import { WithdrawPage } from './features/withdraw/WithdrawPage'
 import { supabaseConfigured } from './lib/supabase'
@@ -37,6 +38,7 @@ function Gate() {
         <Route path="withdraw" element={<WithdrawPage />} />
         <Route path="received" element={<MovementPage key="received" config={RECEIVED} />} />
         <Route path="items" element={isAdmin ? <ItemsPage /> : <Navigate to="/" />} />
+        <Route path="sales-orders" element={isAdmin ? <SalesOrdersPage /> : <Navigate to="/" />} />
         {NAV.filter((n) => n.soon).map((n) => (
           <Route key={n.to} path={n.to.slice(1)} element={<ComingSoon title={n.label} />} />
         ))}

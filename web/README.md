@@ -34,8 +34,9 @@ stock movement goes through a database function (`post_withdrawal`, etc.).
 | Withdraw → Yards / Partial sub-tabs | Add a roll with a starting quantity, then withdraw from it; own ledger, kept separate from the main item stock (see assumption below) |
 | Void (ADMIN) | Posts a REVERSAL ledger row; the original stays in history |
 | Items (ADMIN) | Item master add / edit / deactivate / delete (blocked if it has history) |
+| Sales Orders (ADMIN only) | Read-only, live view of the Sales Order Google Sheet via its "Publish to web" CSV link (Date, Job Order, Customer, Quantity, Width/Unit, Length/Unit, Item ID). Orders are still entered in the sheet; stock is not touched |
 
-Other menu entries (Sales Orders, Served, 3M Yards, Partial Rolls, Search, Audit) are placeholders — note the
+Other menu entries (Served, 3M Yards, Partial Rolls, Search, Audit) are placeholders — note the
 Yards/Partial *withdrawal* workflow already exists under Withdraw; those separate pages would add full roll
 management (edit/close a roll, reports) later.
 
@@ -79,3 +80,10 @@ Received 50, Withdraw 20 → both should show **130** on hand without refreshing
   `partial_roll_transactions`). Whether consuming a roll should also reduce the item's
   ROLLS/PC count in `items` is an open question (plan §44, #23–29) — confirm the rule, then
   wire the two together.
+- **Sales Orders live in the Google Sheet, not the database** (decided 2026-10-22). The page
+  fetches the sheet's published CSV in the browser; the link is stored in `app_settings`
+  (ADMIN-only RLS) and pasted once on the page — never in a `VITE_` variable or the repo,
+  because anyone with the link can read the sheet. Columns are looked up by header name, so
+  reordering sheet columns is fine but renaming one breaks the page (it says which). The
+  sheet's Item IDs (e.g. `HGYB`, `SPYBK_HM`) are not in the item master, and orders don't
+  touch stock.
