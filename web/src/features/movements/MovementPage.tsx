@@ -133,19 +133,19 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
     <div className="space-y-6">
       {!hideTitle && <h1 className="page-title">{config.title}</h1>}
 
-      <form onSubmit={submit} className="card p-5 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <div>
+      <form onSubmit={submit} className="card p-5 grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+        <div className="md:col-span-2 lg:col-span-3">
           <span className="label">Item</span>
           <ItemPicker value={item} onChange={pickItem} />
         </div>
-        <label>
+        <label className="md:col-span-2 lg:col-span-3">
           <span className="label">Description</span>
           <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} />
         </label>
         <label>
           <span className="label">Quantity {item?.uom && <span className="text-slate-400">({item.uom})</span>}</span>
           <input
-            className={`input max-w-xs ${overStock ? 'border-red-500' : ''}`}
+            className={`input ${overStock ? 'border-red-500' : ''}`}
             type="number"
             step="any"
             min="0"
@@ -157,27 +157,27 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
         </label>
         <label>
           <span className="label">Width {item?.width_unit && <span className="text-slate-400">({item.width_unit})</span>}</span>
-          <input className="input max-w-xs" type="number" step="any" min="0" value={width} onChange={(e) => setWidth(e.target.value)} />
+          <input className="input" type="number" step="any" min="0" value={width} onChange={(e) => setWidth(e.target.value)} />
         </label>
         <label>
           <span className="label">Length {item?.length_unit && <span className="text-slate-400">({item.length_unit})</span>}</span>
-          <input className="input max-w-xs" type="number" step="any" min="0" value={length} onChange={(e) => setLength(e.target.value)} />
+          <input className="input" type="number" step="any" min="0" value={length} onChange={(e) => setLength(e.target.value)} />
         </label>
         <label>
           <span className="label">Date</span>
-          <input className="input max-w-xs" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+          <input className="input" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
         {config.fields.map((f) => (
-          <label key={f.name} className={f.wide ? 'md:col-span-2' : ''}>
+          <label key={f.name} className={f.wide ? 'md:col-span-2 lg:col-span-2' : ''}>
             <span className="label">{f.label}</span>
             <input
-              className={`input ${f.wide ? '' : 'max-w-xs'}`}
+              className="input"
               value={extra[f.name] ?? ''}
               onChange={(e) => setExtra({ ...extra, [f.name]: e.target.value })}
             />
           </label>
         ))}
-        <div className="md:col-span-2 lg:col-span-5 flex items-center gap-3">
+        <div className="md:col-span-2 lg:col-span-6 flex items-center gap-3">
           <button className="btn-primary" disabled={busy || overStock}>
             {busy ? 'Saving…' : `Save ${config.title}`}
           </button>
