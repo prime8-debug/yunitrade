@@ -135,28 +135,28 @@ export function SalesOrdersPage() {
             <thead>
               <tr>
                 <th>Date</th>
-                <th>Job Order</th>
-                <th>Customer</th>
+                <th>Item ID</th>
                 <th className="text-right">Quantity</th>
                 <th className="text-right">Width</th>
                 <th>Unit (W)</th>
                 <th className="text-right">Length</th>
                 <th>Unit (L)</th>
-                <th>Item ID</th>
+                <th>Customer</th>
+                <th>Job Order</th>
               </tr>
             </thead>
             <tbody>
               {visible.slice(0, shown).map((o) => (
                 <tr key={o.key}>
                   <td className="whitespace-nowrap">{o.date}</td>
-                  <td className="font-mono font-semibold whitespace-nowrap">{o.jobOrder}</td>
-                  <td>{o.customer}</td>
+                  <td className="font-mono whitespace-nowrap">{o.itemId}</td>
                   <td className="text-right">{o.quantity && !isNaN(Number(o.quantity)) ? formatQty(Number(o.quantity)) : o.quantity}</td>
                   <td className="text-right">{o.width}</td>
                   <td>{o.widthUnit}</td>
                   <td className="text-right">{o.length}</td>
                   <td>{o.lengthUnit}</td>
-                  <td className="font-mono whitespace-nowrap">{o.itemId}</td>
+                  <td>{o.customer}</td>
+                  <td className="font-mono font-semibold whitespace-nowrap">{o.jobOrder}</td>
                 </tr>
               ))}
               {visible.length === 0 && (
