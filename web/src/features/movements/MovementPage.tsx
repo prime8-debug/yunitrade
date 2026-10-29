@@ -239,17 +239,11 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
           <span className="label">Date</span>
           <input className="input" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
-        {canSendToYards && (
-          <label className="flex items-center gap-2 self-end pb-2">
-            <input type="checkbox" checked={toYards} onChange={(e) => setSendToYards(e.target.checked)} />
-            <span className="text-sm text-slate-700">Send to Yards</span>
-          </label>
-        )}
         {toYards && (
           <>
             <label>
               <span className="label">Core No.</span>
-              <input className="input" data-first-extra value={coreNo} onChange={(e) => setCoreNo(e.target.value)} />
+              <input className="input max-w-24" maxLength={10} data-first-extra value={coreNo} onChange={(e) => setCoreNo(e.target.value)} />
             </label>
             <label>
               <span className="label">Yards</span>
@@ -299,6 +293,12 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
           <button type="button" className="btn-secondary" onClick={clearForm} disabled={busy}>
             Clear
           </button>
+          {canSendToYards && (
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={toYards} onChange={(e) => setSendToYards(e.target.checked)} />
+              <span className="text-sm text-slate-700">Send to Yards</span>
+            </label>
+          )}
           {message && <span className={`text-sm ${message.kind === 'ok' ? 'text-green-700' : 'text-red-600'}`}>{message.text}</span>}
         </div>
       </form>
