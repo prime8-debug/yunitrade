@@ -236,7 +236,9 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
           <span className="label">Description</span>
           <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} />
         </label>
-        <label>
+        {/* Withdraw: Quantity → Remarks on one row, sized to their content; Core No. slots in after Date when Send to Yards is ticked. */}
+        <div className={canSendToYards ? 'md:col-span-2 lg:col-span-6 flex flex-wrap gap-4' : 'contents'}>
+        <label className={canSendToYards ? 'w-32' : ''}>
           <span className="label">Quantity {item?.uom && <span className="text-slate-400">({item.uom})</span>}</span>
           <input
             ref={quantityRef}
@@ -261,17 +263,15 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
           />
           {overStock && <span className="text-xs text-red-600">More than on hand ({formatQty(item!.on_hand)})</span>}
         </label>
-        <label>
+        <label className={canSendToYards ? 'w-28' : ''}>
           <span className="label">Width {item?.width_unit && <span className="text-slate-400">({item.width_unit})</span>}</span>
           <input className="input" type="number" step="any" min="0" value={width} onChange={(e) => setWidth(e.target.value)} />
         </label>
-        <label>
+        <label className={canSendToYards ? 'w-28' : ''}>
           <span className="label">Length {item?.length_unit && <span className="text-slate-400">({item.length_unit})</span>}</span>
           <input className="input" type="number" step="any" min="0" value={length} onChange={(e) => setLength(e.target.value)} />
         </label>
-        {/* Send to Yards: Date, Core No., Withdrawal No. and Customer share the rest of the Quantity/Width/Length row; Remarks goes below. */}
-        <div className={toYards ? 'md:col-span-2 lg:col-span-3 flex flex-wrap gap-4' : 'contents'}>
-          <label className={toYards ? 'w-40' : ''}>
+          <label className={canSendToYards ? 'w-40' : ''}>
             <span className="label">Date</span>
             <input className="input" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
           </label>
@@ -281,14 +281,10 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
               <input className="input" maxLength={10} data-first-extra value={coreNo} onChange={(e) => setCoreNo(e.target.value)} />
             </label>
           )}
-          {config.fields
-            .filter((f) => !toYards || f.name !== 'remarks')
-            .map((f, n) => renderExtraField(f, n, toYards ? 'flex-1 min-w-40' : f.wide ? 'md:col-span-2 lg:col-span-2' : ''))}
+          {config.fields.map((f, n) =>
+            renderExtraField(f, n, canSendToYards ? (f.wide ? 'flex-1 min-w-48' : 'w-60') : f.wide ? 'md:col-span-2 lg:col-span-2' : ''),
+          )}
         </div>
-        {toYards &&
-          config.fields
-            .filter((f) => f.name === 'remarks')
-            .map((f) => renderExtraField(f, -1, 'md:col-span-2 lg:col-span-2'))}
         <datalist id="job-order-suggestions">
           {jobOrderSuggestions.map((o) => (
             <option key={o.jobOrder} value={o.jobOrder} label={[o.customer, o.itemId, o.quantity].filter(Boolean).join(' · ')} />
