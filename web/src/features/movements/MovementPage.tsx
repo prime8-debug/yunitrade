@@ -190,6 +190,39 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
     if (error) setMessage({ kind: 'error', text: errorMessage(error) })
   }
 
+  function renderExtraField(f: MovementConfig['fields'][number], n: number, className: string) {
+    return (
+          <label key={f.name} className={className}>
+            <span className="label">{f.label}</span>
+            <input
+              className="input"
+              {...(n === 0 && !toYards ? { 'data-first-extra': true } : {})}
+              {...(f.name === 'withdrawal_no' ? { list: 'job-order-suggestions', autoComplete: 'off' } : {})}
+              value={extra[f.name] ?? ''}
+              data-field={f.name}
+              onKeyDown={(e) => {
+                // Withdraw: Enter in Withdrawal No. moves on to Remarks instead of submitting the form.
+                if (e.key !== 'Enter' || f.name !== 'withdrawal_no') return
+                const remarks = e.currentTarget.form?.querySelector<HTMLInputElement>('[data-field="remarks"]')
+                if (!remarks) return
+                e.preventDefault()
+                remarks.focus()
+              }}
+              onChange={(e) => {
+                const value = e.target.value
+                const next = { ...extra, [f.name]: value }
+                // Picking (or typing in full) a Job Order from the Sales Orders sheet fills in its customer.
+                if (f.name === 'withdrawal_no' && config.fields.some((x) => x.name === 'customer')) {
+                  const match = jobOrderSuggestions.find((o) => o.jobOrder.toLowerCase() === value.trim().toLowerCase())
+                  if (match?.customer) next.customer = match.customer
+                }
+                setExtra(next)
+              }}
+            />
+          </label>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {!hideTitle && <h1 className="page-title">{config.title}</h1>}
@@ -236,48 +269,26 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
           <span className="label">Length {item?.length_unit && <span className="text-slate-400">({item.length_unit})</span>}</span>
           <input className="input" type="number" step="any" min="0" value={length} onChange={(e) => setLength(e.target.value)} />
         </label>
-        <label>
-          <span className="label">Date</span>
-          <input className="input" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
-        </label>
-        <div className={toYards ? 'md:col-span-2 lg:col-span-6 flex flex-wrap gap-4' : 'contents'}>
-        {toYards && (
-          <label className="w-24">
-            <span className="label">Core No.</span>
-            <input className="input" maxLength={10} data-first-extra value={coreNo} onChange={(e) => setCoreNo(e.target.value)} />
+        {/* Send to Yards: Date, Core No., Withdrawal No. and Customer share the rest of the Quantity/Width/Length row; Remarks goes below. */}
+        <div className={toYards ? 'md:col-span-2 lg:col-span-3 flex flex-wrap gap-4' : 'contents'}>
+          <label className={toYards ? 'w-40' : ''}>
+            <span className="label">Date</span>
+            <input className="input" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
           </label>
-        )}
-        {config.fields.map((f, n) => (
-          <label key={f.name} className={toYards ? (f.wide ? 'flex-1 min-w-48' : 'w-56') : f.wide ? 'md:col-span-2 lg:col-span-2' : ''}>
-            <span className="label">{f.label}</span>
-            <input
-              className="input"
-              {...(n === 0 && !toYards ? { 'data-first-extra': true } : {})}
-              {...(f.name === 'withdrawal_no' ? { list: 'job-order-suggestions', autoComplete: 'off' } : {})}
-              value={extra[f.name] ?? ''}
-              data-field={f.name}
-              onKeyDown={(e) => {
-                // Withdraw: Enter in Withdrawal No. moves on to Remarks instead of submitting the form.
-                if (e.key !== 'Enter' || f.name !== 'withdrawal_no') return
-                const remarks = e.currentTarget.form?.querySelector<HTMLInputElement>('[data-field="remarks"]')
-                if (!remarks) return
-                e.preventDefault()
-                remarks.focus()
-              }}
-              onChange={(e) => {
-                const value = e.target.value
-                const next = { ...extra, [f.name]: value }
-                // Picking (or typing in full) a Job Order from the Sales Orders sheet fills in its customer.
-                if (f.name === 'withdrawal_no' && config.fields.some((x) => x.name === 'customer')) {
-                  const match = jobOrderSuggestions.find((o) => o.jobOrder.toLowerCase() === value.trim().toLowerCase())
-                  if (match?.customer) next.customer = match.customer
-                }
-                setExtra(next)
-              }}
-            />
-          </label>
-        ))}
+          {toYards && (
+            <label className="w-24">
+              <span className="label">Core No.</span>
+              <input className="input" maxLength={10} data-first-extra value={coreNo} onChange={(e) => setCoreNo(e.target.value)} />
+            </label>
+          )}
+          {config.fields
+            .filter((f) => !toYards || f.name !== 'remarks')
+            .map((f, n) => renderExtraField(f, n, toYards ? 'flex-1 min-w-40' : f.wide ? 'md:col-span-2 lg:col-span-2' : ''))}
         </div>
+        {toYards &&
+          config.fields
+            .filter((f) => f.name === 'remarks')
+            .map((f) => renderExtraField(f, -1, 'md:col-span-2 lg:col-span-2'))}
         <datalist id="job-order-suggestions">
           {jobOrderSuggestions.map((o) => (
             <option key={o.jobOrder} value={o.jobOrder} label={[o.customer, o.itemId, o.quantity].filter(Boolean).join(' · ')} />
