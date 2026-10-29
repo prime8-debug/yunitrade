@@ -17,12 +17,11 @@ interface YardsRow {
   available_balance: number
 }
 
-type SubTab = 'stock' | 'roll' | 'withdraw'
+type SubTab = 'stock' | 'roll'
 
 const TABS: { id: SubTab; label: string }[] = [
   { id: 'stock', label: 'Yards Stock' },
   { id: 'roll', label: 'Add / Edit Roll' },
-  { id: 'withdraw', label: 'Withdraw Yards' },
 ]
 
 export function YardsStockPage() {
@@ -45,7 +44,6 @@ export function YardsStockPage() {
       </div>
       {tab === 'stock' && <YardsStockTable />}
       {tab === 'roll' && <RollLedgerPanel key="yards-roll" config={YARDS} mode="add" />}
-      {tab === 'withdraw' && <RollLedgerPanel key="yards-withdraw" config={YARDS} mode="withdraw" />}
     </div>
   )
 }
