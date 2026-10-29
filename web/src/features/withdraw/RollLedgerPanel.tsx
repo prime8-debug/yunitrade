@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { ItemPicker } from '../../components/ItemPicker'
 import { errorMessage, supabase } from '../../lib/supabase'
@@ -50,6 +50,7 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
   const [rollSearchOpen, setRollSearchOpen] = useState(false)
   const [date, setDate] = useState(today)
   const [qty, setQty] = useState('')
+  const qtyRef = useRef<HTMLInputElement>(null)
   const [customer, setCustomer] = useState('')
   const [withdrawalNo, setWithdrawalNo] = useState('')
   // Yards: each roll's width (its own, else the item's), shown read-only as "Roll Width".
@@ -259,6 +260,12 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
                 placeholder="e.g. 2"
                 value={roll ? (roll.roll_no ?? '') : coreQuery}
                 onChange={(e) => typeCoreNo(e.target.value)}
+                onKeyDown={(e) => {
+                  // Core No. already picks the roll, so Tab skips the Item box and goes straight to the quantity.
+                  if (e.key !== 'Tab' || e.shiftKey) return
+                  e.preventDefault()
+                  qtyRef.current?.focus()
+                }}
               />
             </label>
             <div className="flex-1 min-w-64 relative">
@@ -333,6 +340,7 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
             <label className="w-36">
               <span className="label">{config.unitLabel}</span>
               <input
+                ref={qtyRef}
                 className={`input ${overStock ? 'border-red-500' : ''}`}
                 type="number"
                 step="any"
