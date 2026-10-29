@@ -33,6 +33,7 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
   const [editing, setEditing] = useState<RollRow | null>(null)
   const [rolls, setRolls] = useState<RollRow[]>([])
   const [rollQuery, setRollQuery] = useState('')
+  const [coreQuery, setCoreQuery] = useState('')
   const [listQuery, setListQuery] = useState('')
 
   // Create-roll form
@@ -164,9 +165,17 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
 
     setSaveMsg({ kind: 'ok', text: `Withdrew ${formatQty(withdrawQty)} from ${roll.item_code}${roll.roll_no ? ` (${roll.roll_no})` : ''}.` })
     setRoll(null)
+    setCoreQuery('')
     setQty('')
     setCustomer('')
     setRemarks('')
+  }
+
+  /** Typing a roll's exact Core No. selects that roll; the box then shows the selected roll's Core No. */
+  function typeCoreNo(value: string) {
+    setCoreQuery(value)
+    const q = value.trim().toLowerCase()
+    setRoll(q ? (rolls.find((r) => (r.roll_no ?? '').toLowerCase() === q) ?? null) : null)
   }
 
   return (
@@ -226,9 +235,9 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
       {showWithdraw && (
       <div className="card p-5">
         <h2 className="font-semibold text-slate-700 mb-3">Withdraw {config.title}</h2>
-        <form onSubmit={withdraw} className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <form onSubmit={withdraw} className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
           <div className="lg:col-span-2 relative">
-            <span className="label">Roll</span>
+            <span className="label">Item</span>
             {roll ? (
               <div className="flex items-center justify-between rounded border border-slate-300 bg-slate-50 px-3 py-2">
                 <div>
@@ -243,7 +252,10 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
                     {formatQty(remaining(roll))} {roll.uom}
                   </div>
                 </div>
-                <button type="button" className="ml-3 text-sm text-blue-600 underline" onClick={() => setRoll(null)}>
+                <button type="button" className="ml-3 text-sm text-blue-600 underline" onClick={() => {
+                    setRoll(null)
+                    setCoreQuery('')
+                  }}>
                   Change
                 </button>
               </div>
@@ -287,6 +299,16 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
             )}
           </div>
           <label>
+            <span className="label">Core No.</span>
+            <input
+              className="input max-w-28"
+              maxLength={10}
+              placeholder="e.g. 2"
+              value={roll ? (roll.roll_no ?? '') : coreQuery}
+              onChange={(e) => typeCoreNo(e.target.value)}
+            />
+          </label>
+          <label>
             <span className="label">Date</span>
             <input className="input max-w-xs" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
           </label>
@@ -310,7 +332,7 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
             <span className="label">Remarks</span>
             <input className="input" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
           </label>
-          <div className="md:col-span-2 lg:col-span-5 flex items-center gap-3">
+          <div className="md:col-span-2 lg:col-span-6 flex items-center gap-3">
             <button className="btn-primary" disabled={saving || overStock}>
               {saving ? 'Saving…' : `Withdraw ${config.unitLabel}`}
             </button>

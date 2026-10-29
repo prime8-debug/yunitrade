@@ -302,7 +302,9 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
       ))}
     </datalist>
   )
-  const actions = (className: string) => (
+  const messageText = message && <span className={`text-sm ${message.kind === 'ok' ? 'text-green-700' : 'text-red-600'}`}>{message.text}</span>
+  // inlineMessage=false: the caller shows the message on its own line so a long one can't push the buttons down.
+  const actions = (className: string, inlineMessage = true) => (
     <div className={className}>
       <button className="btn-primary" disabled={busy || overStock}>
         {busy ? 'Saving…' : toYards ? 'Send 1 Roll to Yards' : `Save ${config.title}`}
@@ -316,7 +318,7 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
           <span className="text-sm text-slate-700">Send to Yards</span>
         </label>
       )}
-      {message && <span className={`text-sm ${message.kind === 'ok' ? 'text-green-700' : 'text-red-600'}`}>{message.text}</span>}
+      {inlineMessage && messageText}
     </div>
   )
 
@@ -339,8 +341,9 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
           </div>
           <div className="flex flex-wrap items-end gap-4">
             {config.fields.map((f, n) => renderExtraField(f, n, f.wide ? 'w-96' : 'w-60'))}
-            {actions('flex flex-wrap items-center gap-3')}
+            {actions('flex flex-wrap items-center gap-3', false)}
           </div>
+          {message && <p className="-mt-1">{messageText}</p>}
           {jobOrderList}
         </form>
       ) : (
