@@ -172,8 +172,8 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
             onKeyDown={(e) => {
-              // Withdraw: Tab from Quantity jumps straight to Withdrawal No. (Width/Length/Date are pre-filled).
-              if (e.key !== 'Tab' || e.shiftKey || config.table !== 'withdrawals') return
+              // Withdraw / Received: Tab from Quantity jumps straight to Withdrawal No. / MRR No. (Width/Length/Date are pre-filled).
+              if (e.key !== 'Tab' || e.shiftKey || (config.table !== 'withdrawals' && config.table !== 'receipts')) return
               const next = e.currentTarget.form?.querySelector<HTMLInputElement>('[data-first-extra]')
               if (next) {
                 e.preventDefault()

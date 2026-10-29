@@ -35,7 +35,6 @@ export const RECEIVED: MovementConfig = {
   fields: [
     { name: 'mrr_no', param: 'p_mrr_no', label: 'MRR No.' },
     { name: 'supplier', param: 'p_supplier', label: 'Supplier' },
-    { name: 'reference', param: 'p_reference', label: 'Reference' },
     { name: 'remarks', param: 'p_remarks', label: 'Remarks' },
   ],
 }
