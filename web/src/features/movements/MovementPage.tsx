@@ -203,6 +203,15 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
               {...(n === 0 ? { 'data-first-extra': true } : {})}
               {...(f.name === 'withdrawal_no' ? { list: 'job-order-suggestions', autoComplete: 'off' } : {})}
               value={extra[f.name] ?? ''}
+              data-field={f.name}
+              onKeyDown={(e) => {
+                // Withdraw: Enter in Withdrawal No. moves on to Remarks instead of submitting the form.
+                if (e.key !== 'Enter' || f.name !== 'withdrawal_no') return
+                const remarks = e.currentTarget.form?.querySelector<HTMLInputElement>('[data-field="remarks"]')
+                if (!remarks) return
+                e.preventDefault()
+                remarks.focus()
+              }}
               onChange={(e) => {
                 const value = e.target.value
                 const next = { ...extra, [f.name]: value }
