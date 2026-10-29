@@ -18,6 +18,7 @@ export function ItemPicker({ value, onChange, unitLabel }: Props) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<StockRow[]>([])
   const [open, setOpen] = useState(false)
+  const [active, setActive] = useState(-1) // keyboard-highlighted suggestion
 
   useEffect(() => {
     const q = query.trim()
@@ -35,6 +36,7 @@ export function ItemPicker({ value, onChange, unitLabel }: Props) {
         .order('item_code')
         .limit(15)
       setResults((data as StockRow[]) ?? [])
+      setActive(-1)
     }, 200)
     return () => clearTimeout(t)
   }, [query])
@@ -84,11 +86,20 @@ export function ItemPicker({ value, onChange, unitLabel }: Props) {
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         onKeyDown={(e) => {
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            if (results.length === 0) return
+            e.preventDefault()
+            setOpen(true)
+            const step = e.key === 'ArrowDown' ? 1 : -1
+            setActive((i) => (i + step + results.length) % results.length)
+            return
+          }
+          if (e.key === 'Escape') return setOpen(false)
           if (e.key !== 'Enter') return
           e.preventDefault() // don't submit the form while still picking an item
-          const exact = results.find((r) => r.item_code.toLowerCase() === query.trim().toLowerCase())
-          if (exact) {
-            onChange(exact)
+          const pick = (open && results[active]) || results.find((r) => r.item_code.toLowerCase() === query.trim().toLowerCase())
+          if (pick) {
+            onChange(pick)
             setQuery('')
             setOpen(false)
           }
@@ -96,11 +107,14 @@ export function ItemPicker({ value, onChange, unitLabel }: Props) {
       />
       {open && results.length > 0 && (
         <ul className="absolute z-10 mt-1 w-full max-h-72 overflow-auto rounded border border-slate-200 bg-white shadow-lg">
-          {results.map((r) => (
+          {results.map((r, n) => (
             <li key={r.item_id}>
               <button
                 type="button"
-                className="w-full text-left px-3 py-2 hover:bg-slate-100 flex justify-between gap-2"
+                className={`w-full text-left px-3 py-2 hover:bg-slate-100 flex justify-between gap-2 ${n === active ? 'bg-slate-100' : ''}`}
+                ref={(el) => {
+                  if (n === active) el?.scrollIntoView({ block: 'nearest' })
+                }}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   onChange(r)
