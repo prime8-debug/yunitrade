@@ -39,6 +39,7 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
   const [newItem, setNewItem] = useState<StockRow | null>(null)
   const [newRollNo, setNewRollNo] = useState('')
   const [newQty, setNewQty] = useState('')
+  const [newWidth, setNewWidth] = useState('')
   const [newRemarks, setNewRemarks] = useState('')
   const [creating, setCreating] = useState(false)
   const [createMsg, setCreateMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
@@ -84,6 +85,7 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
     setNewItem(null)
     setNewRollNo('')
     setNewQty('')
+    setNewWidth('')
     setNewRemarks('')
   }
 
@@ -92,13 +94,14 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
     setCreateMsg(null)
     const [{ data: stock }, { data: summary }] = await Promise.all([
       supabase.from('current_stock').select('*').eq('item_id', r.item_id).single(),
-      supabase.from('yards_stock_summary').select('total_received').eq('roll_id', r.roll_id).single(),
+      supabase.from('yards_stock_summary').select('total_received, width').eq('roll_id', r.roll_id).single(),
     ])
     if (!stock || !summary) return setCreateMsg({ kind: 'error', text: 'Could not load that roll.' })
     setEditing(r)
     setNewItem(stock as StockRow)
     setNewRollNo(r.roll_no ?? '')
     setNewQty(String(summary.total_received))
+    setNewWidth(summary.width != null ? String(summary.width) : '')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -116,6 +119,7 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
         p_roll_no: newRollNo.trim() || null,
         p_item_id: newItem.item_id,
         p_received_yards: n,
+        p_width: newWidth === '' ? null : Number(newWidth),
       })
       setCreating(false)
       if (error) return setCreateMsg({ kind: 'error', text: errorMessage(error) })
@@ -129,6 +133,7 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
       p_roll_no: newRollNo.trim() || null,
       p_entry_date: date,
       p_remarks: newRemarks.trim() || null,
+      ...(config.hasWidth ? { p_width: newWidth === '' ? null : Number(newWidth) } : {}),
     })
     setCreating(false)
     if (error) return setCreateMsg({ kind: 'error', text: errorMessage(error) })
@@ -171,15 +176,28 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
         <h2 className="font-semibold text-slate-700 mb-3">
           {editing ? `Edit Roll (${editing.roll_no ?? editing.item_code})` : `Add Roll (${config.title})`}
         </h2>
-        <form onSubmit={createRoll} className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <form onSubmit={createRoll} className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
           <div className="lg:col-span-2">
             <span className="label">Item</span>
-            <ItemPicker value={newItem} onChange={setNewItem} />
+            <ItemPicker
+              value={newItem}
+              onChange={(item) => {
+                setNewItem(item)
+                // Width defaults to the item's catalog width; change it if this roll differs.
+                if (config.hasWidth) setNewWidth(item?.width != null ? String(item.width) : '')
+              }}
+            />
           </div>
           <label>
             <span className="label">Roll No.</span>
             <input className="input max-w-xs" value={newRollNo} onChange={(e) => setNewRollNo(e.target.value)} />
           </label>
+          {config.hasWidth && (
+            <label>
+              <span className="label">Width {newItem?.width_unit && <span className="text-slate-400">({newItem.width_unit})</span>}</span>
+              <input className="input max-w-xs" type="number" step="any" min="0" value={newWidth} onChange={(e) => setNewWidth(e.target.value)} />
+            </label>
+          )}
           <label>
             <span className="label">{config.unitLabel}</span>
             <input className="input max-w-xs" type="number" step="any" min="0" value={newQty} onChange={(e) => setNewQty(e.target.value)} />
@@ -190,7 +208,7 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
               <input className="input" value={newRemarks} onChange={(e) => setNewRemarks(e.target.value)} />
             </label>
           )}
-          <div className="md:col-span-2 lg:col-span-5 flex items-center gap-3">
+          <div className="md:col-span-2 lg:col-span-6 flex items-center gap-3">
             <button className="btn-primary" disabled={creating}>
               {creating ? 'Saving…' : editing ? 'Save Changes' : 'Add Roll'}
             </button>

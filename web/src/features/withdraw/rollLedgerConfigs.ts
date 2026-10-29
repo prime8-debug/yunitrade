@@ -12,6 +12,8 @@ export interface RollLedgerConfig {
   rollIdParam: 'p_roll_id' | 'p_partial_roll_id'
   /** ADMIN-only RPC to correct a roll's number / item / received quantity (Yards only). */
   editRpc?: 'update_yards_roll'
+  /** Roll has its own Width box (Yards only); defaults to the item's catalog width. */
+  hasWidth?: boolean
 }
 
 export const YARDS: RollLedgerConfig = {
@@ -26,6 +28,7 @@ export const YARDS: RollLedgerConfig = {
   withdrawRpc: 'withdraw_yards',
   rollIdParam: 'p_roll_id',
   editRpc: 'update_yards_roll',
+  hasWidth: true,
 }
 
 export const PARTIAL: RollLedgerConfig = {
