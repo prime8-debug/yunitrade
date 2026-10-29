@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { ItemPicker } from '../../components/ItemPicker'
 import { ItemsCatalog } from '../../components/ItemsCatalog'
@@ -43,6 +43,7 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
   const [length, setLength] = useState('')
   const [description, setDescription] = useState('')
   const [extra, setExtra] = useState<Record<string, string>>({})
+  const quantityRef = useRef<HTMLInputElement>(null)
   const salesOrders = useSalesOrders()
   // Withdrawal No. suggestions: Job Orders from the Sales Orders sheet matching what's typed (prefix matches first).
   const typedNo = (extra.withdrawal_no ?? '').trim().toLowerCase()
@@ -153,7 +154,7 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
       <form onSubmit={submit} className="card p-5 grid gap-4 md:grid-cols-2 lg:grid-cols-6">
         <div className="md:col-span-2 lg:col-span-3">
           <span className="label">Item</span>
-          <ItemPicker value={item} onChange={pickItem} />
+          <ItemPicker value={item} onChange={pickItem} onPickedWithKeyboard={() => setTimeout(() => quantityRef.current?.focus(), 0)} />
         </div>
         <label className="md:col-span-2 lg:col-span-3">
           <span className="label">Description</span>
@@ -162,6 +163,7 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
         <label>
           <span className="label">Quantity {item?.uom && <span className="text-slate-400">({item.uom})</span>}</span>
           <input
+            ref={quantityRef}
             className={`input ${overStock ? 'border-red-500' : ''}`}
             type="number"
             step="any"

@@ -7,6 +7,8 @@ interface Props {
   onChange: (item: StockRow | null) => void
   /** Override the unit shown next to on-hand (e.g. "roll" in Split & Withdraw), instead of the item's stocking UOM. */
   unitLabel?: string
+  /** Called after an item is chosen with the keyboard (Enter), e.g. to move focus to the next field. */
+  onPickedWithKeyboard?: () => void
 }
 
 /**
@@ -14,7 +16,7 @@ interface Props {
  * Picking an item (click, or typing the exact code and pressing Enter) fills
  * its Description/Width/Length/UOM back into the form automatically.
  */
-export function ItemPicker({ value, onChange, unitLabel }: Props) {
+export function ItemPicker({ value, onChange, unitLabel, onPickedWithKeyboard }: Props) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<StockRow[]>([])
   const [open, setOpen] = useState(false)
@@ -102,6 +104,7 @@ export function ItemPicker({ value, onChange, unitLabel }: Props) {
             onChange(pick)
             setQuery('')
             setOpen(false)
+            onPickedWithKeyboard?.()
           }
         }}
       />
