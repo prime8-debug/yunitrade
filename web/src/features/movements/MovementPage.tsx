@@ -203,7 +203,16 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
               {...(n === 0 ? { 'data-first-extra': true } : {})}
               {...(f.name === 'withdrawal_no' ? { list: 'job-order-suggestions', autoComplete: 'off' } : {})}
               value={extra[f.name] ?? ''}
-              onChange={(e) => setExtra({ ...extra, [f.name]: e.target.value })}
+              onChange={(e) => {
+                const value = e.target.value
+                const next = { ...extra, [f.name]: value }
+                // Picking (or typing in full) a Job Order from the Sales Orders sheet fills in its customer.
+                if (f.name === 'withdrawal_no' && config.fields.some((x) => x.name === 'customer')) {
+                  const match = jobOrderSuggestions.find((o) => o.jobOrder.toLowerCase() === value.trim().toLowerCase())
+                  if (match?.customer) next.customer = match.customer
+                }
+                setExtra(next)
+              }}
             />
           </label>
         ))}
