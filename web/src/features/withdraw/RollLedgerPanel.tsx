@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useAuth } from '../../auth/AuthProvider'
 import { ItemPicker } from '../../components/ItemPicker'
 import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
@@ -24,7 +25,12 @@ interface RollRow {
  * separate from the main items/inventory_transactions stock — see the
  * migration comment for why (open business question, plan §44).
  */
-export function RollLedgerPanel({ config }: { config: RollLedgerConfig }) {
+export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerConfig; mode?: 'all' | 'add' | 'withdraw' }) {
+  const { isAdmin } = useAuth()
+  const showAdd = mode !== 'withdraw'
+  const showWithdraw = mode !== 'add'
+  const canEdit = showAdd && isAdmin && !!config.editRpc
+  const [editing, setEditing] = useState<RollRow | null>(null)
   const [rolls, setRolls] = useState<RollRow[]>([])
   const [rollQuery, setRollQuery] = useState('')
   const [listQuery, setListQuery] = useState('')
@@ -73,6 +79,29 @@ export function RollLedgerPanel({ config }: { config: RollLedgerConfig }) {
       })
     : rolls
 
+  function resetCreateForm() {
+    setEditing(null)
+    setNewItem(null)
+    setNewRollNo('')
+    setNewQty('')
+    setNewRemarks('')
+  }
+
+  /** Load a roll into the Add form for editing (its item and received quantity come from the DB). */
+  async function startEdit(r: RollRow) {
+    setCreateMsg(null)
+    const [{ data: stock }, { data: summary }] = await Promise.all([
+      supabase.from('current_stock').select('*').eq('item_id', r.item_id).single(),
+      supabase.from('yards_stock_summary').select('total_received').eq('roll_id', r.roll_id).single(),
+    ])
+    if (!stock || !summary) return setCreateMsg({ kind: 'error', text: 'Could not load that roll.' })
+    setEditing(r)
+    setNewItem(stock as StockRow)
+    setNewRollNo(r.roll_no ?? '')
+    setNewQty(String(summary.total_received))
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   async function createRoll(e: React.FormEvent) {
     e.preventDefault()
     if (!newItem) return setCreateMsg({ kind: 'error', text: 'Select an item first.' })
@@ -81,6 +110,19 @@ export function RollLedgerPanel({ config }: { config: RollLedgerConfig }) {
 
     setCreating(true)
     setCreateMsg(null)
+    if (editing && config.editRpc) {
+      const { error } = await supabase.rpc(config.editRpc, {
+        p_roll_id: editing.roll_id,
+        p_roll_no: newRollNo.trim() || null,
+        p_item_id: newItem.item_id,
+        p_received_yards: n,
+      })
+      setCreating(false)
+      if (error) return setCreateMsg({ kind: 'error', text: errorMessage(error) })
+      setCreateMsg({ kind: 'ok', text: `Updated roll ${newRollNo.trim() || newItem.item_code}.` })
+      resetCreateForm()
+      return
+    }
     const { error } = await supabase.rpc(config.createRpc, {
       p_item_id: newItem.item_id,
       [config.createQtyParam]: n,
@@ -92,10 +134,7 @@ export function RollLedgerPanel({ config }: { config: RollLedgerConfig }) {
     if (error) return setCreateMsg({ kind: 'error', text: errorMessage(error) })
 
     setCreateMsg({ kind: 'ok', text: `Roll created for ${newItem.item_code}.` })
-    setNewItem(null)
-    setNewRollNo('')
-    setNewQty('')
-    setNewRemarks('')
+    resetCreateForm()
   }
 
   const withdrawQty = Number(qty)
@@ -127,8 +166,11 @@ export function RollLedgerPanel({ config }: { config: RollLedgerConfig }) {
 
   return (
     <div className="space-y-6">
+      {showAdd && (
       <div className="card p-5">
-        <h2 className="font-semibold text-slate-700 mb-3">Add Roll ({config.title})</h2>
+        <h2 className="font-semibold text-slate-700 mb-3">
+          {editing ? `Edit Roll (${editing.roll_no ?? editing.item_code})` : `Add Roll (${config.title})`}
+        </h2>
         <form onSubmit={createRoll} className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           <div className="lg:col-span-2">
             <span className="label">Item</span>
@@ -142,19 +184,28 @@ export function RollLedgerPanel({ config }: { config: RollLedgerConfig }) {
             <span className="label">{config.unitLabel}</span>
             <input className="input max-w-xs" type="number" step="any" min="0" value={newQty} onChange={(e) => setNewQty(e.target.value)} />
           </label>
-          <label>
-            <span className="label">Remarks</span>
-            <input className="input" value={newRemarks} onChange={(e) => setNewRemarks(e.target.value)} />
-          </label>
+          {!editing && (
+            <label>
+              <span className="label">Remarks</span>
+              <input className="input" value={newRemarks} onChange={(e) => setNewRemarks(e.target.value)} />
+            </label>
+          )}
           <div className="md:col-span-2 lg:col-span-5 flex items-center gap-3">
             <button className="btn-primary" disabled={creating}>
-              {creating ? 'Saving…' : 'Add Roll'}
+              {creating ? 'Saving…' : editing ? 'Save Changes' : 'Add Roll'}
             </button>
+            {editing && (
+              <button type="button" className="btn-secondary" onClick={resetCreateForm} disabled={creating}>
+                Cancel
+              </button>
+            )}
             {createMsg && <span className={`text-sm ${createMsg.kind === 'ok' ? 'text-green-700' : 'text-red-600'}`}>{createMsg.text}</span>}
           </div>
         </form>
       </div>
+      )}
 
+      {showWithdraw && (
       <div className="card p-5">
         <h2 className="font-semibold text-slate-700 mb-3">Withdraw {config.title}</h2>
         <form onSubmit={withdraw} className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -249,6 +300,7 @@ export function RollLedgerPanel({ config }: { config: RollLedgerConfig }) {
           </div>
         </form>
       </div>
+      )}
 
       <div>
         <h2 className="font-semibold text-slate-700 mb-2">{config.title} Rolls</h2>
@@ -267,6 +319,7 @@ export function RollLedgerPanel({ config }: { config: RollLedgerConfig }) {
                 <th>Roll No.</th>
                 <th>UOM</th>
                 <th className="text-right">Remaining</th>
+                {canEdit && <th />}
               </tr>
             </thead>
             <tbody>
@@ -277,11 +330,18 @@ export function RollLedgerPanel({ config }: { config: RollLedgerConfig }) {
                   <td>{r.roll_no}</td>
                   <td>{r.uom}</td>
                   <td className={`text-right font-semibold ${remaining(r) <= 0 ? 'text-red-600' : ''}`}>{formatQty(remaining(r))}</td>
+                  {canEdit && (
+                    <td className="text-right">
+                      <button className="text-xs text-blue-600 underline" onClick={() => startEdit(r)}>
+                        Edit
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
               {visibleRolls.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="text-center text-slate-400 py-6">
+                  <td colSpan={canEdit ? 6 : 5} className="text-center text-slate-400 py-6">
                     {rolls.length === 0 ? 'No rolls yet — add one above.' : 'No rolls match that filter.'}
                   </td>
                 </tr>

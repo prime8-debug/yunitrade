@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
 import { formatQty } from '../../lib/types'
+import { RollLedgerPanel } from '../withdraw/RollLedgerPanel'
+import { YARDS } from '../withdraw/rollLedgerConfigs'
 
 interface YardsRow {
   roll_id: string
@@ -15,8 +17,41 @@ interface YardsRow {
   available_balance: number
 }
 
-/** Per-roll Yards stock: what came in, what went out, what's left. Rolls are created/withdrawn under Withdraw → Yards. */
+type SubTab = 'stock' | 'roll' | 'withdraw'
+
+const TABS: { id: SubTab; label: string }[] = [
+  { id: 'stock', label: 'Yards Stock' },
+  { id: 'roll', label: 'Add / Edit Roll' },
+  { id: 'withdraw', label: 'Withdraw Yards' },
+]
+
 export function YardsStockPage() {
+  const [tab, setTab] = useState<SubTab>('stock')
+  return (
+    <div>
+      <h1 className="page-title">Yards Stock</h1>
+      <div className="mb-4 flex gap-1 border-b border-slate-200">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
+              tab === t.id ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {tab === 'stock' && <YardsStockTable />}
+      {tab === 'roll' && <RollLedgerPanel key="yards-roll" config={YARDS} mode="add" />}
+      {tab === 'withdraw' && <RollLedgerPanel key="yards-withdraw" config={YARDS} mode="withdraw" />}
+    </div>
+  )
+}
+
+/** Per-roll Yards stock: what came in, what went out, what's left. */
+function YardsStockTable() {
   const [rows, setRows] = useState<YardsRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -48,8 +83,7 @@ export function YardsStockPage() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
-        <h1 className="page-title mb-0">Yards Stock</h1>
+      <div className="flex flex-wrap items-end justify-end gap-3 mb-4">
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-1 text-sm text-slate-600">
             <input type="checkbox" checked={hideZero} onChange={(e) => setHideZero(e.target.checked)} />
@@ -91,7 +125,7 @@ export function YardsStockPage() {
             {!loading && visible.length === 0 && (
               <tr>
                 <td colSpan={8} className="text-center text-slate-400 py-6">
-                  {rows.length === 0 ? 'No yards rolls yet — add one under Withdraw → Yards.' : 'No rolls match that filter.'}
+                  {rows.length === 0 ? 'No yards rolls yet — add one under Add / Edit Roll.' : 'No rolls match that filter.'}
                 </td>
               </tr>
             )}

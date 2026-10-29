@@ -10,6 +10,8 @@ export interface RollLedgerConfig {
   createQtyParam: 'p_received_yards' | 'p_quantity'
   withdrawRpc: 'withdraw_yards' | 'withdraw_partial_roll'
   rollIdParam: 'p_roll_id' | 'p_partial_roll_id'
+  /** ADMIN-only RPC to correct a roll's number / item / received quantity (Yards only). */
+  editRpc?: 'update_yards_roll'
 }
 
 export const YARDS: RollLedgerConfig = {
@@ -23,6 +25,7 @@ export const YARDS: RollLedgerConfig = {
   createQtyParam: 'p_received_yards',
   withdrawRpc: 'withdraw_yards',
   rollIdParam: 'p_roll_id',
+  editRpc: 'update_yards_roll',
 }
 
 export const PARTIAL: RollLedgerConfig = {
