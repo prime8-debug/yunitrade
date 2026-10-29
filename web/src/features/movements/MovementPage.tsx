@@ -240,16 +240,15 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
           <span className="label">Date</span>
           <input className="input" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
+        <div className={toYards ? 'md:col-span-2 lg:col-span-6 flex flex-wrap gap-4' : 'contents'}>
         {toYards && (
-          <>
-            <label>
-              <span className="label">Core No.</span>
-              <input className="input max-w-24" maxLength={10} data-first-extra value={coreNo} onChange={(e) => setCoreNo(e.target.value)} />
-            </label>
-          </>
+          <label className="w-24">
+            <span className="label">Core No.</span>
+            <input className="input" maxLength={10} data-first-extra value={coreNo} onChange={(e) => setCoreNo(e.target.value)} />
+          </label>
         )}
         {config.fields.map((f, n) => (
-          <label key={f.name} className={f.wide ? 'md:col-span-2 lg:col-span-2' : ''}>
+          <label key={f.name} className={toYards ? (f.wide ? 'flex-1 min-w-48' : 'w-56') : f.wide ? 'md:col-span-2 lg:col-span-2' : ''}>
             <span className="label">{f.label}</span>
             <input
               className="input"
@@ -278,6 +277,7 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
             />
           </label>
         ))}
+        </div>
         <datalist id="job-order-suggestions">
           {jobOrderSuggestions.map((o) => (
             <option key={o.jobOrder} value={o.jobOrder} label={[o.customer, o.itemId, o.quantity].filter(Boolean).join(' · ')} />
