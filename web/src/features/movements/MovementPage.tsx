@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { ItemPicker } from '../../components/ItemPicker'
 import { ItemsCatalog } from '../../components/ItemsCatalog'
 import { BeginningAdjustmentLog } from './BeginningAdjustmentLog'
 import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
+import { useSalesOrders } from '../../lib/useSalesOrders'
 import { formatQty, type StockRow } from '../../lib/types'
 import type { MovementConfig } from './configs'
 
@@ -42,6 +43,22 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
   const [length, setLength] = useState('')
   const [description, setDescription] = useState('')
   const [extra, setExtra] = useState<Record<string, string>>({})
+  const salesOrders = useSalesOrders()
+  // Withdrawal No. suggestions: Job Orders from the Sales Orders sheet matching what's typed (prefix matches first).
+  const typedNo = (extra.withdrawal_no ?? '').trim().toLowerCase()
+  const jobOrderSuggestions = useMemo(() => {
+    if (config.table !== 'withdrawals' || typedNo.length < 2) return []
+    const seen = new Set<string>()
+    const starts: typeof salesOrders = []
+    const contains: typeof salesOrders = []
+    for (const o of salesOrders) {
+      const j = o.jobOrder.toLowerCase()
+      if (seen.has(j) || !j.includes(typedNo)) continue
+      seen.add(j)
+      ;(j.startsWith(typedNo) ? starts : contains).push(o)
+    }
+    return [...starts, ...contains].slice(0, 15)
+  }, [config.table, typedNo, salesOrders])
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
   const [recent, setRecent] = useState<RecentRow[]>([])
@@ -182,11 +199,17 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
             <input
               className="input"
               {...(n === 0 ? { 'data-first-extra': true } : {})}
+              {...(f.name === 'withdrawal_no' ? { list: 'job-order-suggestions', autoComplete: 'off' } : {})}
               value={extra[f.name] ?? ''}
               onChange={(e) => setExtra({ ...extra, [f.name]: e.target.value })}
             />
           </label>
         ))}
+        <datalist id="job-order-suggestions">
+          {jobOrderSuggestions.map((o) => (
+            <option key={o.jobOrder} value={o.jobOrder} label={[o.customer, o.itemId, o.quantity].filter(Boolean).join(' · ')} />
+          ))}
+        </datalist>
         <div className="md:col-span-2 lg:col-span-6 flex items-center gap-3">
           <button className="btn-primary" disabled={busy || overStock}>
             {busy ? 'Saving…' : `Save ${config.title}`}
