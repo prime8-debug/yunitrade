@@ -51,6 +51,9 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
   const [date, setDate] = useState(today)
   const [qty, setQty] = useState('')
   const [customer, setCustomer] = useState('')
+  const [withdrawalNo, setWithdrawalNo] = useState('')
+  // Yards: each roll's width (its own, else the item's), shown read-only as "Roll Width".
+  const [rollWidths, setRollWidths] = useState<Record<string, string>>({})
   const [remarks, setRemarks] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
@@ -58,7 +61,15 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
   const load = useCallback(async () => {
     const { data } = await supabase.from(config.stockView).select('*').eq('active', true).order('item_code')
     setRolls((data as RollRow[]) ?? [])
-  }, [config.stockView])
+    if (config.hasWidth) {
+      const { data: sizes } = await supabase.from('yards_stock_summary').select('roll_id, width, width_unit')
+      const map: Record<string, string> = {}
+      for (const r of (sizes as { roll_id: string; width: number | null; width_unit: string | null }[]) ?? []) {
+        if (r.width != null) map[r.roll_id] = `${r.width}${r.width_unit ? ` ${r.width_unit}` : ''}`
+      }
+      setRollWidths(map)
+    }
+  }, [config.stockView, config.hasWidth])
   useEffect(() => {
     load()
   }, [load])
@@ -159,6 +170,7 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
       p_entry_date: date,
       p_customer: customer.trim() || null,
       p_remarks: remarks.trim() || null,
+      p_withdrawal_no: withdrawalNo.trim() || null,
     })
     setSaving(false)
     if (error) return setSaveMsg({ kind: 'error', text: errorMessage(error) })
@@ -168,6 +180,7 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
     setCoreQuery('')
     setQty('')
     setCustomer('')
+    setWithdrawalNo('')
     setRemarks('')
   }
 
@@ -235,109 +248,123 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
       {showWithdraw && (
       <div className="card p-5">
         <h2 className="font-semibold text-slate-700 mb-3">Withdraw {config.title}</h2>
-        <form onSubmit={withdraw} className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
-          <div className="lg:col-span-2 relative">
-            <span className="label">Item</span>
-            {roll ? (
-              <div className="flex items-center justify-between rounded border border-slate-300 bg-slate-50 px-3 py-2">
-                <div>
-                  <div className="font-mono font-semibold">
-                    {roll.item_code} {roll.roll_no && <span className="text-slate-500">· {roll.roll_no}</span>}
+        {/* Row 1: Core No., Item, Roll Width, qty, Withdrawal No., Customer, Date. Row 2: button + Remarks. */}
+        <form onSubmit={withdraw} className="space-y-4">
+          <div className="flex flex-wrap items-start gap-4">
+            <label className="w-28">
+              <span className="label">Core No.</span>
+              <input
+                className="input"
+                maxLength={10}
+                placeholder="e.g. 2"
+                value={roll ? (roll.roll_no ?? '') : coreQuery}
+                onChange={(e) => typeCoreNo(e.target.value)}
+              />
+            </label>
+            <div className="flex-1 min-w-64 relative">
+              <span className="label">Item</span>
+              {roll ? (
+                <div className="flex items-center rounded border border-slate-300 bg-slate-50 px-3 py-2">
+                  <div className="font-mono font-semibold truncate" title={roll.description}>
+                    {roll.item_code}
                   </div>
-                  <div className="text-xs text-slate-500">{roll.description}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-slate-500">Remaining</div>
-                  <div className="font-semibold">
-                    {formatQty(remaining(roll))} {roll.uom}
+                  <div className="ml-auto pl-3 whitespace-nowrap text-sm">
+                    <span className="text-xs text-slate-500">Remaining </span>
+                    <span className="font-semibold">{formatQty(remaining(roll))}</span>
                   </div>
+                  <button
+                    type="button"
+                    className="ml-3 -mr-1 rounded px-1.5 text-lg leading-none text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                    title="Change roll"
+                    aria-label="Change roll"
+                    onClick={() => {
+                      setRoll(null)
+                      setCoreQuery('')
+                    }}
+                  >
+                    ×
+                  </button>
                 </div>
-                <button type="button" className="ml-3 text-sm text-blue-600 underline" onClick={() => {
-                    setRoll(null)
-                    setCoreQuery('')
-                  }}>
-                  Change
-                </button>
-              </div>
-            ) : (
-              <>
-                <input
-                  className="input"
-                  placeholder="Type item code or roll no…"
-                  value={rollQuery}
-                  onChange={(e) => setRollQuery(e.target.value)}
-                  onFocus={() => setRollSearchOpen(true)}
-                  onBlur={() => setTimeout(() => setRollSearchOpen(false), 150)}
-                />
-                {rollSearchOpen && matches.length > 0 && (
-                  <ul className="absolute z-10 mt-1 w-full max-h-72 overflow-auto rounded border border-slate-200 bg-white shadow-lg">
-                    {matches.map((r) => (
-                      <li key={r.roll_id}>
-                        <button
-                          type="button"
-                          className="w-full text-left px-3 py-2 hover:bg-slate-100 flex justify-between gap-2"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => {
-                            setRoll(r)
-                            setRollQuery('')
-                            setRollSearchOpen(false)
-                          }}
-                        >
-                          <span>
-                            <span className="font-mono font-semibold">{r.item_code}</span>{' '}
-                            {r.roll_no && <span className="text-slate-500">· {r.roll_no}</span>}
-                          </span>
-                          <span className="text-sm text-slate-600 whitespace-nowrap">
-                            {formatQty(remaining(r))} {r.uom}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </>
+              ) : (
+                <>
+                  <input
+                    className="input"
+                    placeholder="Type item code or roll no…"
+                    value={rollQuery}
+                    onChange={(e) => setRollQuery(e.target.value)}
+                    onFocus={() => setRollSearchOpen(true)}
+                    onBlur={() => setTimeout(() => setRollSearchOpen(false), 150)}
+                  />
+                  {rollSearchOpen && matches.length > 0 && (
+                    <ul className="absolute z-10 mt-1 w-full max-h-72 overflow-auto rounded border border-slate-200 bg-white shadow-lg">
+                      {matches.map((r) => (
+                        <li key={r.roll_id}>
+                          <button
+                            type="button"
+                            className="w-full text-left px-3 py-2 hover:bg-slate-100 flex justify-between gap-2"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              setRoll(r)
+                              setRollQuery('')
+                              setRollSearchOpen(false)
+                            }}
+                          >
+                            <span>
+                              <span className="font-mono font-semibold">{r.item_code}</span>{' '}
+                              {r.roll_no && <span className="text-slate-500">· {r.roll_no}</span>}
+                            </span>
+                            <span className="text-sm text-slate-600 whitespace-nowrap">
+                              {formatQty(remaining(r))} {r.uom}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              )}
+            </div>
+            {config.hasWidth && (
+              <label className="w-36">
+                <span className="label">Roll Width</span>
+                <input className="input bg-slate-50" readOnly tabIndex={-1} value={roll ? (rollWidths[roll.roll_id] ?? '') : ''} />
+              </label>
             )}
+            <label className="w-36">
+              <span className="label">{config.unitLabel}</span>
+              <input
+                className={`input ${overStock ? 'border-red-500' : ''}`}
+                type="number"
+                step="any"
+                min="0"
+                value={qty}
+                onChange={(e) => setQty(e.target.value)}
+              />
+              {overStock && <span className="text-xs text-red-600">More than remaining ({formatQty(remaining(roll!))})</span>}
+            </label>
+            <label className="w-60">
+              <span className="label">Withdrawal No.</span>
+              <input className="input" value={withdrawalNo} onChange={(e) => setWithdrawalNo(e.target.value)} />
+            </label>
+            <label className="w-60">
+              <span className="label">Customer</span>
+              <input className="input" value={customer} onChange={(e) => setCustomer(e.target.value)} />
+            </label>
+            <label className="w-40">
+              <span className="label">Date</span>
+              <input className="input" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+            </label>
           </div>
-          <label>
-            <span className="label">Core No.</span>
-            <input
-              className="input max-w-28"
-              maxLength={10}
-              placeholder="e.g. 2"
-              value={roll ? (roll.roll_no ?? '') : coreQuery}
-              onChange={(e) => typeCoreNo(e.target.value)}
-            />
-          </label>
-          <label>
-            <span className="label">Date</span>
-            <input className="input max-w-xs" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
-          </label>
-          <label>
-            <span className="label">{config.unitLabel}</span>
-            <input
-              className={`input max-w-xs ${overStock ? 'border-red-500' : ''}`}
-              type="number"
-              step="any"
-              min="0"
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-            />
-            {overStock && <span className="text-xs text-red-600">More than remaining ({formatQty(remaining(roll!))})</span>}
-          </label>
-          <label>
-            <span className="label">Customer</span>
-            <input className="input max-w-xs" value={customer} onChange={(e) => setCustomer(e.target.value)} />
-          </label>
-          <label className="md:col-span-2 lg:col-span-1">
-            <span className="label">Remarks</span>
-            <input className="input" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-          </label>
-          <div className="md:col-span-2 lg:col-span-6 flex items-center gap-3">
+          <div className="flex flex-wrap items-end gap-4">
             <button className="btn-primary" disabled={saving || overStock}>
               {saving ? 'Saving…' : `Withdraw ${config.unitLabel}`}
             </button>
-            {saveMsg && <span className={`text-sm ${saveMsg.kind === 'ok' ? 'text-green-700' : 'text-red-600'}`}>{saveMsg.text}</span>}
+            <label className="w-96">
+              <span className="label">Remarks</span>
+              <input className="input" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+            </label>
           </div>
+          {saveMsg && <p className={`text-sm ${saveMsg.kind === 'ok' ? 'text-green-700' : 'text-red-600'}`}>{saveMsg.text}</p>}
         </form>
       </div>
       )}
