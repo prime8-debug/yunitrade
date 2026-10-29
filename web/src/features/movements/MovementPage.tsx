@@ -152,6 +152,15 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
             required
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
+            onKeyDown={(e) => {
+              // Withdraw: Tab from Quantity jumps straight to Withdrawal No. (Width/Length/Date are pre-filled).
+              if (e.key !== 'Tab' || e.shiftKey || config.table !== 'withdrawals') return
+              const next = e.currentTarget.form?.querySelector<HTMLInputElement>('[data-first-extra]')
+              if (next) {
+                e.preventDefault()
+                next.focus()
+              }
+            }}
           />
           {overStock && <span className="text-xs text-red-600">More than on hand ({formatQty(item!.on_hand)})</span>}
         </label>
@@ -167,11 +176,12 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
           <span className="label">Date</span>
           <input className="input" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
-        {config.fields.map((f) => (
+        {config.fields.map((f, n) => (
           <label key={f.name} className={f.wide ? 'md:col-span-2 lg:col-span-2' : ''}>
             <span className="label">{f.label}</span>
             <input
               className="input"
+              {...(n === 0 ? { 'data-first-extra': true } : {})}
               value={extra[f.name] ?? ''}
               onChange={(e) => setExtra({ ...extra, [f.name]: e.target.value })}
             />
