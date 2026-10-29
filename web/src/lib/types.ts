@@ -47,6 +47,7 @@ export type TransactionType =
   | 'WITHDRAWAL'
   | 'SPLIT_PARENT'
   | 'SPLIT_CHILD'
+  | 'TO_YARDS'
   | 'ADJUSTMENT'
   | 'DISPOSAL'
   | 'RETURN'

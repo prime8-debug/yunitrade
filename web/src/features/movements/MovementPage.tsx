@@ -11,6 +11,14 @@ import type { MovementConfig } from './configs'
 
 const today = () => new Date().toLocaleDateString('en-CA') // YYYY-MM-DD in local time
 
+/** A roll's catalog length expressed in yards (items list length in yd / m / ft), for Send to Yards. */
+function lengthInYards(length: number | null | undefined, unit: string | null | undefined): string {
+  if (length == null) return ''
+  const u = (unit ?? '').trim().toLowerCase()
+  const yards = u.startsWith('y') || u === '' ? length : u === 'm' ? length * 1.0936133 : u.startsWith('f') ? length / 3 : u.startsWith('in') ? length / 36 : length
+  return String(Math.round(yards * 100) / 100)
+}
+
 interface RecentRow {
   id: string
   entry_date: string
@@ -43,6 +51,11 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
   const [length, setLength] = useState('')
   const [description, setDescription] = useState('')
   const [extra, setExtra] = useState<Record<string, string>>({})
+  // Withdraw only: open ONE whole roll from main stock into Yards Stock instead of withdrawing it to a customer.
+  const canSendToYards = config.table === 'withdrawals'
+  const [toYards, setToYards] = useState(false)
+  const [coreNo, setCoreNo] = useState('')
+  const [yards, setYards] = useState('')
   const quantityRef = useRef<HTMLInputElement>(null)
   const salesOrders = useSalesOrders()
   // Withdrawal No. suggestions: Job Orders from the Sales Orders sheet matching what's typed (prefix matches first).
@@ -72,6 +85,12 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
     setWidth(next?.width?.toString() ?? '')
     setLength(next?.length?.toString() ?? '')
     setDescription(next?.description ?? '')
+    setYards(lengthInYards(next?.length, next?.length_unit))
+  }
+
+  function setSendToYards(on: boolean) {
+    setToYards(on)
+    if (on) setQuantity('1')
   }
 
   const loadRecent = useCallback(async () => {
@@ -108,6 +127,28 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
     if (!item) return setMessage({ kind: 'error', text: 'Select an item first.' })
     if (!(qty > 0)) return setMessage({ kind: 'error', text: 'Quantity must be greater than 0.' })
 
+    if (toYards) {
+      const y = Number(yards)
+      if (!(y > 0)) return setMessage({ kind: 'error', text: 'Yards must be greater than 0.' })
+      setBusy(true)
+      setMessage(null)
+      const { error } = await supabase.rpc('send_roll_to_yards', {
+        p_item_id: item.item_id,
+        p_yards: y,
+        p_roll_no: coreNo.trim() || null,
+        p_width: width.trim() === '' ? null : Number(width),
+        p_entry_date: date,
+        p_remarks: extra.remarks?.trim() || null,
+      })
+      setBusy(false)
+      if (error) return setMessage({ kind: 'error', text: errorMessage(error) })
+      setMessage({ kind: 'ok', text: `Sent 1 roll of ${item.item_code} to Yards Stock (${formatQty(y)} yd${coreNo.trim() ? `, Core No. ${coreNo.trim()}` : ''}).` })
+      pickItem(null)
+      setCoreNo('')
+      setExtra({})
+      return
+    }
+
     setBusy(true)
     setMessage(null)
     const params: Record<string, unknown> = {
@@ -135,7 +176,8 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
   function clearForm() {
     pickItem(null)
     setDate(today())
-    setQuantity('')
+    setQuantity(toYards ? '1' : '')
+    setCoreNo('')
     setExtra({})
     setMessage(null)
   }
@@ -169,6 +211,8 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
             step="any"
             min="0"
             required
+            readOnly={toYards}
+            title={toYards ? 'Send to Yards opens one roll at a time' : undefined}
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
             onKeyDown={(e) => {
@@ -195,12 +239,30 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
           <span className="label">Date</span>
           <input className="input" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
-        {config.fields.map((f, n) => (
+        {canSendToYards && (
+          <label className="flex items-center gap-2 self-end pb-2">
+            <input type="checkbox" checked={toYards} onChange={(e) => setSendToYards(e.target.checked)} />
+            <span className="text-sm text-slate-700">Send to Yards</span>
+          </label>
+        )}
+        {toYards && (
+          <>
+            <label>
+              <span className="label">Core No.</span>
+              <input className="input" data-first-extra value={coreNo} onChange={(e) => setCoreNo(e.target.value)} />
+            </label>
+            <label>
+              <span className="label">Yards</span>
+              <input className="input" type="number" step="any" min="0" required value={yards} onChange={(e) => setYards(e.target.value)} />
+            </label>
+          </>
+        )}
+        {config.fields.filter((f) => !toYards || f.name === 'remarks').map((f, n) => (
           <label key={f.name} className={f.wide ? 'md:col-span-2 lg:col-span-2' : ''}>
             <span className="label">{f.label}</span>
             <input
               className="input"
-              {...(n === 0 ? { 'data-first-extra': true } : {})}
+              {...(n === 0 && !toYards ? { 'data-first-extra': true } : {})}
               {...(f.name === 'withdrawal_no' ? { list: 'job-order-suggestions', autoComplete: 'off' } : {})}
               value={extra[f.name] ?? ''}
               data-field={f.name}
@@ -232,7 +294,7 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
         </datalist>
         <div className="md:col-span-2 lg:col-span-6 flex items-center gap-3">
           <button className="btn-primary" disabled={busy || overStock}>
-            {busy ? 'Saving…' : `Save ${config.title}`}
+            {busy ? 'Saving…' : toYards ? 'Send 1 Roll to Yards' : `Save ${config.title}`}
           </button>
           <button type="button" className="btn-secondary" onClick={clearForm} disabled={busy}>
             Clear

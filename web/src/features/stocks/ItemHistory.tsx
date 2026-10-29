@@ -40,10 +40,13 @@ export function ItemHistory({ item, onClose }: { item: StockRow; onClose: () => 
     if (reason === null) return
     setError(null)
     // Split & Withdraw rows belong to an operation, which has its own void function (reason required).
+    // Send to Yards rows: putting the roll back also empties and deactivates its yards roll.
     const { error } =
       r.reference_type === 'inventory_operations'
         ? await supabase.rpc('void_split_withdrawal', { p_operation_id: r.reference_id, p_reason: reason.trim() || null })
-        : await supabase.rpc('void_entry', { p_reference_type: r.reference_type, p_reference_id: r.reference_id, p_reason: reason || null })
+        : r.reference_type === 'yards_rolls'
+          ? await supabase.rpc('void_send_to_yards', { p_roll_id: r.reference_id, p_reason: reason || null })
+          : await supabase.rpc('void_entry', { p_reference_type: r.reference_type, p_reference_id: r.reference_id, p_reason: reason || null })
     if (error) setError(errorMessage(error))
   }
 
