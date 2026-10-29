@@ -46,30 +46,23 @@ export function ItemPicker({ value, onChange, unitLabel, onPickedWithKeyboard }:
   if (value) {
     return (
       <div className="flex items-center justify-between rounded border border-slate-300 bg-slate-50 px-3 py-2">
-        <div>
-          <div className="font-mono font-semibold">{value.item_code}</div>
-          <div className="text-xs text-slate-500">{value.description}</div>
+        {/* Description / W / L already show in the form's own fields — only the code and stock here. */}
+        <div className="font-mono font-semibold truncate" title={value.description}>
+          {value.item_code}
         </div>
-        {/* W / L come from the item master — display only, never re-entered here. */}
-        <div className="flex items-center gap-4 px-4">
-          <div className="text-right">
-            <div className="text-xs text-slate-500">W ({value.width_unit ?? '—'})</div>
-            <div className="font-semibold">{value.width ?? '—'}</div>
-          </div>
-          <div className="text-right">
-            <div className="text-xs text-slate-500">L ({value.length_unit ?? '—'})</div>
-            <div className="font-semibold">{value.length ?? '—'}</div>
-          </div>
+        <div className="ml-auto pl-3 whitespace-nowrap text-sm">
+          <span className="text-xs text-slate-500">On hand </span>
+          <span className="font-semibold">{formatQty(value.on_hand)}</span>
+          {(unitLabel ?? value.uom) && <span className="text-xs text-slate-500"> {unitLabel ?? value.uom}</span>}
         </div>
-        <div className="text-right">
-          <div className="text-xs text-slate-500">On hand</div>
-          <div className="font-semibold">
-            {formatQty(value.on_hand)}{' '}
-            {(unitLabel ?? value.uom) && <span className="text-xs font-normal text-slate-500">{unitLabel ?? value.uom}</span>}
-          </div>
-        </div>
-        <button type="button" className="ml-3 text-sm text-blue-600 underline" onClick={() => onChange(null)}>
-          Change
+        <button
+          type="button"
+          className="ml-3 -mr-1 rounded px-1.5 text-lg leading-none text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+          onClick={() => onChange(null)}
+          title="Change item"
+          aria-label="Change item"
+        >
+          ×
         </button>
       </div>
     )

@@ -216,6 +216,13 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
                 if (f.name === 'withdrawal_no' && config.fields.some((x) => x.name === 'customer')) {
                   const match = jobOrderSuggestions.find((o) => o.jobOrder.toLowerCase() === value.trim().toLowerCase())
                   if (match?.customer) next.customer = match.customer
+                  // The browser's suggestion list swallows the Enter that picks a Job Order, so move on to Remarks
+                  // right when a suggestion is chosen (a pick arrives as a replacement, not typed characters).
+                  const inputType = (e.nativeEvent as InputEvent).inputType
+                  if (match && (inputType === 'insertReplacementText' || inputType === undefined)) {
+                    const remarks = e.currentTarget.form?.querySelector<HTMLInputElement>('[data-field="remarks"]')
+                    setTimeout(() => remarks?.focus(), 0)
+                  }
                 }
                 setExtra(next)
               }}
