@@ -55,7 +55,6 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
   const canSendToYards = config.table === 'withdrawals'
   const [toYards, setToYards] = useState(false)
   const [coreNo, setCoreNo] = useState('')
-  const [yards, setYards] = useState('')
   const quantityRef = useRef<HTMLInputElement>(null)
   const salesOrders = useSalesOrders()
   // Withdrawal No. suggestions: Job Orders from the Sales Orders sheet matching what's typed (prefix matches first).
@@ -85,7 +84,6 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
     setWidth(next?.width?.toString() ?? '')
     setLength(next?.length?.toString() ?? '')
     setDescription(next?.description ?? '')
-    setYards(lengthInYards(next?.length, next?.length_unit))
   }
 
   function setSendToYards(on: boolean) {
@@ -128,8 +126,9 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
     if (!(qty > 0)) return setMessage({ kind: 'error', text: 'Quantity must be greater than 0.' })
 
     if (toYards) {
-      const y = Number(yards)
-      if (!(y > 0)) return setMessage({ kind: 'error', text: 'Yards must be greater than 0.' })
+      // The roll's yards = the Length box (prefilled from the item, editable), converted to yards.
+      const y = Number(lengthInYards(length.trim() === '' ? null : Number(length), item.length_unit))
+      if (!(y > 0)) return setMessage({ kind: 'error', text: 'Enter the roll Length to send it to Yards.' })
       setBusy(true)
       setMessage(null)
       const { error } = await supabase.rpc('send_roll_to_yards', {
@@ -139,6 +138,8 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
         p_width: width.trim() === '' ? null : Number(width),
         p_entry_date: date,
         p_remarks: extra.remarks?.trim() || null,
+        p_withdrawal_no: extra.withdrawal_no?.trim() || null,
+        p_customer: extra.customer?.trim() || null,
       })
       setBusy(false)
       if (error) return setMessage({ kind: 'error', text: errorMessage(error) })
@@ -245,13 +246,9 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
               <span className="label">Core No.</span>
               <input className="input max-w-24" maxLength={10} data-first-extra value={coreNo} onChange={(e) => setCoreNo(e.target.value)} />
             </label>
-            <label>
-              <span className="label">Yards</span>
-              <input className="input" type="number" step="any" min="0" required value={yards} onChange={(e) => setYards(e.target.value)} />
-            </label>
           </>
         )}
-        {config.fields.filter((f) => !toYards || f.name === 'remarks').map((f, n) => (
+        {config.fields.map((f, n) => (
           <label key={f.name} className={f.wide ? 'md:col-span-2 lg:col-span-2' : ''}>
             <span className="label">{f.label}</span>
             <input
