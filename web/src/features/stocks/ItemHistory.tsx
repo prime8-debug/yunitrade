@@ -39,8 +39,25 @@ export function ItemHistory({ item, onClose }: { item: StockRow; onClose: () => 
     const reason = window.prompt(`Void this ${r.transaction_type} entry (${r.transaction_date}, qty ${formatQty(r.quantity)})?\nReason:`)
     if (reason === null) return
     setError(null)
-    const { error } = await supabase.rpc('void_entry', { p_reference_type: r.reference_type, p_reference_id: r.reference_id, p_reason: reason || null })
+    // Split & Withdraw rows belong to an operation, which has its own void function (reason required).
+    const { error } =
+      r.reference_type === 'inventory_operations'
+        ? await supabase.rpc('void_split_withdrawal', { p_operation_id: r.reference_id, p_reason: reason.trim() || null })
+        : await supabase.rpc('void_entry', { p_reference_type: r.reference_type, p_reference_id: r.reference_id, p_reason: reason || null })
     if (error) setError(errorMessage(error))
+  }
+
+  async function clearHistory() {
+    const typed = window.prompt(
+      `Permanently DELETE all ${rows.length} history rows of ${item.item_code} (beginning, received, withdrawn, adjustments)?\n` +
+        `Stock will go back to 0. This cannot be undone.\n\nType the item code to confirm:`,
+    )
+    if (typed === null) return
+    if (typed.trim().toUpperCase() !== item.item_code.toUpperCase()) return setError('Item code did not match — nothing was deleted.')
+    setError(null)
+    const { error } = await supabase.rpc('clear_item_history', { p_item_id: item.item_id })
+    if (error) return setError(errorMessage(error))
+    load()
   }
 
   return (
@@ -51,9 +68,16 @@ export function ItemHistory({ item, onClose }: { item: StockRow; onClose: () => 
             <h2 className="text-lg font-bold font-mono">{item.item_code}</h2>
             <p className="text-sm text-slate-500">{item.description}</p>
           </div>
-          <button className="btn-secondary" onClick={onClose}>
-            Close
-          </button>
+          <div className="flex items-center gap-2">
+            {isAdmin && rows.length > 0 && (
+              <button className="btn-secondary text-red-600" onClick={clearHistory}>
+                Clear history
+              </button>
+            )}
+            <button className="btn-secondary" onClick={onClose}>
+              Close
+            </button>
+          </div>
         </div>
         {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
         <table className="table">
