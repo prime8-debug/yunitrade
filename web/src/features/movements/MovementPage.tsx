@@ -56,6 +56,7 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
   const [toYards, setToYards] = useState(false)
   const [coreNo, setCoreNo] = useState('')
   const quantityRef = useRef<HTMLInputElement>(null)
+  const coreNoRef = useRef<HTMLInputElement>(null)
   const salesOrders = useSalesOrders()
   // Withdrawal No. suggestions: Job Orders from the Sales Orders sheet matching what's typed (prefix matches first).
   const typedNo = (extra.withdrawal_no ?? '').trim().toLowerCase()
@@ -196,7 +197,7 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
             <span className="label">{f.label}</span>
             <input
               className="input"
-              {...(n === 0 && !toYards ? { 'data-first-extra': true } : {})}
+              {...(n === 0 ? { 'data-first-extra': true } : {})}
               {...(f.name === 'withdrawal_no' ? { list: 'job-order-suggestions', autoComplete: 'off' } : {})}
               value={extra[f.name] ?? ''}
               data-field={f.name}
@@ -223,89 +224,130 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
     )
   }
 
+  // Form pieces, laid out differently for Withdraw (two flex rows) vs Received / Beginning (grid).
+  const itemField = (className: string) => (
+    <div className={className}>
+      <span className="label">Item</span>
+      <ItemPicker value={item} onChange={pickItem} onPickedWithKeyboard={() => setTimeout(() => (toYards ? coreNoRef : quantityRef).current?.focus(), 0)} />
+    </div>
+  )
+  const descriptionField = (className: string) => (
+    <label className={className}>
+      <span className="label">Description</span>
+      <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} />
+    </label>
+  )
+  const coreNoField = (className: string) => (
+    <label className={className}>
+      <span className="label">Core No.</span>
+      <input ref={coreNoRef} className="input" maxLength={10} value={coreNo} onChange={(e) => setCoreNo(e.target.value)} />
+    </label>
+  )
+  const quantityField = (className: string) => (
+    <label className={className}>
+      <span className="label">Quantity {item?.uom && <span className="text-slate-400">({item.uom})</span>}</span>
+      <input
+        ref={quantityRef}
+        className={`input ${overStock ? 'border-red-500' : ''}`}
+        type="number"
+        step="any"
+        min="0"
+        required
+        readOnly={toYards}
+        title={toYards ? 'Send to Yards opens one roll at a time' : undefined}
+        value={quantity}
+        onChange={(e) => setQuantity(e.target.value)}
+        onKeyDown={(e) => {
+          // Withdraw / Received: Tab from Quantity jumps straight to Withdrawal No. / MRR No. (Width/Length/Date are pre-filled).
+          if (e.key !== 'Tab' || e.shiftKey || (config.table !== 'withdrawals' && config.table !== 'receipts')) return
+          const next = e.currentTarget.form?.querySelector<HTMLInputElement>('[data-first-extra]')
+          if (next) {
+            e.preventDefault()
+            next.focus()
+          }
+        }}
+      />
+      {overStock && <span className="text-xs text-red-600">More than on hand ({formatQty(item!.on_hand)})</span>}
+    </label>
+  )
+  const widthField = (className: string) => (
+    <label className={className}>
+      <span className="label">Width {item?.width_unit && <span className="text-slate-400">({item.width_unit})</span>}</span>
+      <input className="input" type="number" step="any" min="0" value={width} onChange={(e) => setWidth(e.target.value)} />
+    </label>
+  )
+  const lengthField = (className: string) => (
+    <label className={className}>
+      <span className="label">Length {item?.length_unit && <span className="text-slate-400">({item.length_unit})</span>}</span>
+      <input className="input" type="number" step="any" min="0" value={length} onChange={(e) => setLength(e.target.value)} />
+    </label>
+  )
+  const dateField = (className: string) => (
+    <label className={className}>
+      <span className="label">Date</span>
+      <input className="input" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+    </label>
+  )
+  const jobOrderList = (
+    <datalist id="job-order-suggestions">
+      {jobOrderSuggestions.map((o) => (
+        <option key={o.jobOrder} value={o.jobOrder} label={[o.customer, o.itemId, o.quantity].filter(Boolean).join(' · ')} />
+      ))}
+    </datalist>
+  )
+  const actions = (className: string) => (
+    <div className={className}>
+      <button className="btn-primary" disabled={busy || overStock}>
+        {busy ? 'Saving…' : toYards ? 'Send 1 Roll to Yards' : `Save ${config.title}`}
+      </button>
+      <button type="button" className="btn-secondary" onClick={clearForm} disabled={busy}>
+        Clear
+      </button>
+      {canSendToYards && (
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={toYards} onChange={(e) => setSendToYards(e.target.checked)} />
+          <span className="text-sm text-slate-700">Send to Yards</span>
+        </label>
+      )}
+      {message && <span className={`text-sm ${message.kind === 'ok' ? 'text-green-700' : 'text-red-600'}`}>{message.text}</span>}
+    </div>
+  )
+
   return (
     <div className="space-y-6">
       {!hideTitle && <h1 className="page-title">{config.title}</h1>}
 
-      <form onSubmit={submit} className="card p-5 grid gap-4 md:grid-cols-2 lg:grid-cols-6">
-        <div className="md:col-span-2 lg:col-span-3">
-          <span className="label">Item</span>
-          <ItemPicker value={item} onChange={pickItem} onPickedWithKeyboard={() => setTimeout(() => quantityRef.current?.focus(), 0)} />
-        </div>
-        <label className="md:col-span-2 lg:col-span-3">
-          <span className="label">Description</span>
-          <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} />
-        </label>
-        {/* Withdraw: Quantity → Remarks on one row, sized to their content; Core No. slots in after Date when Send to Yards is ticked. */}
-        <div className={canSendToYards ? 'md:col-span-2 lg:col-span-6 flex flex-wrap gap-4' : 'contents'}>
-        <label className={canSendToYards ? 'w-32' : ''}>
-          <span className="label">Quantity {item?.uom && <span className="text-slate-400">({item.uom})</span>}</span>
-          <input
-            ref={quantityRef}
-            className={`input ${overStock ? 'border-red-500' : ''}`}
-            type="number"
-            step="any"
-            min="0"
-            required
-            readOnly={toYards}
-            title={toYards ? 'Send to Yards opens one roll at a time' : undefined}
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            onKeyDown={(e) => {
-              // Withdraw / Received: Tab from Quantity jumps straight to Withdrawal No. / MRR No. (Width/Length/Date are pre-filled).
-              if (e.key !== 'Tab' || e.shiftKey || (config.table !== 'withdrawals' && config.table !== 'receipts')) return
-              const next = e.currentTarget.form?.querySelector<HTMLInputElement>('[data-first-extra]')
-              if (next) {
-                e.preventDefault()
-                next.focus()
-              }
-            }}
-          />
-          {overStock && <span className="text-xs text-red-600">More than on hand ({formatQty(item!.on_hand)})</span>}
-        </label>
-        <label className={canSendToYards ? 'w-28' : ''}>
-          <span className="label">Width {item?.width_unit && <span className="text-slate-400">({item.width_unit})</span>}</span>
-          <input className="input" type="number" step="any" min="0" value={width} onChange={(e) => setWidth(e.target.value)} />
-        </label>
-        <label className={canSendToYards ? 'w-28' : ''}>
-          <span className="label">Length {item?.length_unit && <span className="text-slate-400">({item.length_unit})</span>}</span>
-          <input className="input" type="number" step="any" min="0" value={length} onChange={(e) => setLength(e.target.value)} />
-        </label>
-          <label className={canSendToYards ? 'w-40' : ''}>
-            <span className="label">Date</span>
-            <input className="input" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
-          </label>
-          {toYards && (
-            <label className="w-24">
-              <span className="label">Core No.</span>
-              <input className="input" maxLength={10} data-first-extra value={coreNo} onChange={(e) => setCoreNo(e.target.value)} />
-            </label>
-          )}
-          {config.fields.map((f, n) =>
-            renderExtraField(f, n, canSendToYards ? (f.wide ? 'flex-1 min-w-48' : 'w-60') : f.wide ? 'md:col-span-2 lg:col-span-2' : ''),
-          )}
-        </div>
-        <datalist id="job-order-suggestions">
-          {jobOrderSuggestions.map((o) => (
-            <option key={o.jobOrder} value={o.jobOrder} label={[o.customer, o.itemId, o.quantity].filter(Boolean).join(' · ')} />
-          ))}
-        </datalist>
-        <div className="md:col-span-2 lg:col-span-6 flex items-center gap-3">
-          <button className="btn-primary" disabled={busy || overStock}>
-            {busy ? 'Saving…' : toYards ? 'Send 1 Roll to Yards' : `Save ${config.title}`}
-          </button>
-          <button type="button" className="btn-secondary" onClick={clearForm} disabled={busy}>
-            Clear
-          </button>
-          {canSendToYards && (
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={toYards} onChange={(e) => setSendToYards(e.target.checked)} />
-              <span className="text-sm text-slate-700">Send to Yards</span>
-            </label>
-          )}
-          {message && <span className={`text-sm ${message.kind === 'ok' ? 'text-green-700' : 'text-red-600'}`}>{message.text}</span>}
-        </div>
-      </form>
+      {canSendToYards ? (
+        // Withdraw layout: Item, Description, (Core No.), Quantity, Width, Length, Date on top;
+        // Withdrawal No., Customer, Remarks and the buttons underneath.
+        <form onSubmit={submit} className="card p-5 space-y-4">
+          <div className="flex flex-wrap items-start gap-4">
+            {itemField('flex-1 min-w-64')}
+            {descriptionField('flex-1 min-w-64')}
+            {toYards && coreNoField('w-24')}
+            {quantityField('w-44')}
+            {widthField('w-44')}
+            {lengthField('w-36')}
+            {dateField('w-40')}
+          </div>
+          <div className="flex flex-wrap items-end gap-4">
+            {config.fields.map((f, n) => renderExtraField(f, n, f.wide ? 'w-96' : 'w-60'))}
+            {actions('flex flex-wrap items-center gap-3')}
+          </div>
+          {jobOrderList}
+        </form>
+      ) : (
+        <form onSubmit={submit} className="card p-5 grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+          {itemField('md:col-span-2 lg:col-span-3')}
+          {descriptionField('md:col-span-2 lg:col-span-3')}
+          {quantityField('')}
+          {widthField('')}
+          {lengthField('')}
+          {dateField('')}
+          {config.fields.map((f, n) => renderExtraField(f, n, f.wide ? 'md:col-span-2 lg:col-span-2' : ''))}
+          {actions('md:col-span-2 lg:col-span-6 flex items-center gap-3')}
+        </form>
+      )}
 
       {config.showCatalog ? (
         <div className="space-y-6">
