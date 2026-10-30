@@ -17,6 +17,8 @@ export interface RollLedgerConfig {
   summaryView: 'yards_stock_summary' | 'partial_stock_summary'
   /** Roll has its own Width box (Yards only); defaults to the item's catalog width. */
   hasWidth?: boolean
+  /** Roll has its own Width and Length boxes after the quantity (Partial only). */
+  hasSize?: boolean
 }
 
 export const YARDS: RollLedgerConfig = {
@@ -50,4 +52,5 @@ export const PARTIAL: RollLedgerConfig = {
   editRpc: 'update_partial_roll',
   editQtyParam: 'p_quantity',
   summaryView: 'partial_stock_summary',
+  hasSize: true,
 }

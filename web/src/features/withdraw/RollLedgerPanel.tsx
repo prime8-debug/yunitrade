@@ -42,6 +42,7 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
   const [newRollNo, setNewRollNo] = useState('')
   const [newQty, setNewQty] = useState('')
   const [newWidth, setNewWidth] = useState('')
+  const [newLength, setNewLength] = useState('')
   const [newRemarks, setNewRemarks] = useState('')
   const [creating, setCreating] = useState(false)
   const [createMsg, setCreateMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
@@ -112,7 +113,16 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
     setNewRollNo('')
     setNewQty('')
     setNewWidth('')
+    setNewLength('')
     setNewRemarks('')
+  }
+
+  /** p_width / p_length for the create and edit RPCs, when this ledger has them. */
+  function sizeParams() {
+    const num = (v: string) => (v === '' ? null : Number(v))
+    if (config.hasSize) return { p_width: num(newWidth), p_length: num(newLength) }
+    if (config.hasWidth) return { p_width: num(newWidth) }
+    return {}
   }
 
   /** Load a roll into the Add form for editing (its item and received quantity come from the DB). */
@@ -122,9 +132,9 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
       supabase.from('current_stock').select('*').eq('item_id', r.item_id).single(),
       supabase
         .from(config.summaryView)
-        .select(config.hasWidth ? 'total_received, width' : 'total_received')
+        .select(config.hasSize ? 'total_received, width, length' : config.hasWidth ? 'total_received, width' : 'total_received')
         .eq('roll_id', r.roll_id)
-        .single<{ total_received: number; width?: number | null }>(),
+        .single<{ total_received: number; width?: number | null; length?: number | null }>(),
     ])
     if (!stock || !summary) return setCreateMsg({ kind: 'error', text: 'Could not load that roll.' })
     setEditing(r)
@@ -132,6 +142,7 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
     setNewRollNo(r.roll_no ?? '')
     setNewQty(String(summary.total_received))
     setNewWidth(summary.width != null ? String(summary.width) : '')
+    setNewLength(summary.length != null ? String(summary.length) : '')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -149,7 +160,7 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
         p_roll_no: newRollNo.trim() || null,
         p_item_id: newItem.item_id,
         [config.editQtyParam ?? config.createQtyParam]: n,
-        ...(config.hasWidth ? { p_width: newWidth === '' ? null : Number(newWidth) } : {}),
+        ...sizeParams(),
       })
       setCreating(false)
       if (error) return setCreateMsg({ kind: 'error', text: errorMessage(error) })
@@ -163,7 +174,7 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
       p_roll_no: newRollNo.trim() || null,
       p_entry_date: date,
       p_remarks: newRemarks.trim() || null,
-      ...(config.hasWidth ? { p_width: newWidth === '' ? null : Number(newWidth) } : {}),
+      ...sizeParams(),
     })
     setCreating(false)
     if (error) return setCreateMsg({ kind: 'error', text: errorMessage(error) })
@@ -224,7 +235,7 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
               onChange={(item) => {
                 setNewItem(item)
                 // Width defaults to the item's catalog width; change it if this roll differs.
-                if (config.hasWidth) setNewWidth(item?.width != null ? String(item.width) : '')
+                if (config.hasWidth || config.hasSize) setNewWidth(item?.width != null ? String(item.width) : '')
               }}
             />
           </div>
@@ -242,6 +253,19 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
             <span className="label">{config.unitLabel}</span>
             <input className="input max-w-xs" type="number" step="any" min="0" value={newQty} onChange={(e) => setNewQty(e.target.value)} />
           </label>
+          {config.hasSize && (
+            // Width and Length share one column, so each box is half the width of Quantity.
+            <div className="grid grid-cols-2 gap-2">
+              <label>
+                <span className="label">Width {newItem?.width_unit && <span className="text-slate-400">({newItem.width_unit})</span>}</span>
+                <input className="input" type="number" step="any" min="0" value={newWidth} onChange={(e) => setNewWidth(e.target.value)} />
+              </label>
+              <label>
+                <span className="label">Length {newItem?.length_unit && <span className="text-slate-400">({newItem.length_unit})</span>}</span>
+                <input className="input" type="number" step="any" min="0" value={newLength} onChange={(e) => setNewLength(e.target.value)} />
+              </label>
+            </div>
+          )}
           {!editing && (
             <label>
               <span className="label">Remarks</span>
