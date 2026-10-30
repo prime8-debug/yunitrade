@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { errorMessage, supabase } from '../../lib/supabase'
 import { formatQty } from '../../lib/types'
-import { toOrders, type OrderRow } from './salesSheet'
+import { refreshSalesOrders, useSalesOrdersState } from '../../lib/useSalesOrders'
 
 const SETTING_KEY = 'sales_sheet_csv_url'
 const PAGE_SIZE = 200
-const AUTO_REFRESH_MS = 5 * 60 * 1000 // Google only re-publishes the CSV every ~5 minutes anyway
 
 /** ADMIN-only, read-only view of the Sales Order Google Sheet (via its "Publish to web" CSV link). */
 export function SalesOrdersPage() {
@@ -13,42 +12,21 @@ export function SalesOrdersPage() {
   const [editingUrl, setEditingUrl] = useState(false)
   const [urlDraft, setUrlDraft] = useState('')
 
-  const [orders, setOrders] = useState<OrderRow[]>([])
-  const [loading, setLoading] = useState(false)
-  const [loadedAt, setLoadedAt] = useState<Date | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  // Shared with the Withdraw tab: shows the copy saved in this browser at once, refreshes in the background.
+  const { orders, loading, loadedAt, error: sheetError } = useSalesOrdersState()
+  const [settingError, setSettingError] = useState<string | null>(null)
+  const error = settingError ?? sheetError
   const [query, setQuery] = useState('')
   const [shown, setShown] = useState(PAGE_SIZE)
 
   const loadSetting = useCallback(async () => {
     const { data, error } = await supabase.from('app_settings').select('value').eq('key', SETTING_KEY).maybeSingle()
-    if (error) return setError(errorMessage(error))
+    if (error) return setSettingError(errorMessage(error))
     setUrl(data?.value || null)
   }, [])
   useEffect(() => {
     loadSetting()
   }, [loadSetting])
-
-  const loadSheet = useCallback(async () => {
-    if (!url) return
-    setLoading(true)
-    try {
-      const res = await fetch(url, { cache: 'no-store' })
-      if (!res.ok) throw new Error(`Google Sheets returned ${res.status} — is the sheet still published to the web?`)
-      setOrders(toOrders(await res.text()))
-      setLoadedAt(new Date())
-      setError(null)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setLoading(false)
-    }
-  }, [url])
-  useEffect(() => {
-    loadSheet()
-    const t = setInterval(loadSheet, AUTO_REFRESH_MS)
-    return () => clearInterval(t)
-  }, [loadSheet])
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -60,18 +38,20 @@ export function SalesOrdersPage() {
     e.preventDefault()
     const value = urlDraft.trim()
     if (!/^https:\/\/docs\.google\.com\/spreadsheets\/.+output=csv/.test(value)) {
-      return setError('Paste the link from File → Share → Publish to web, with the format set to CSV (it ends in output=csv).')
+      return setSettingError('Paste the link from File → Share → Publish to web, with the format set to CSV (it ends in output=csv).')
     }
     const { error } = await supabase.from('app_settings').upsert({ key: SETTING_KEY, value, updated_at: new Date().toISOString() })
-    if (error) return setError(errorMessage(error))
-    setError(null)
+    if (error) return setSettingError(errorMessage(error))
+    setSettingError(null)
     setEditingUrl(false)
     setUrl(value)
+    refreshSalesOrders(true)
   }
 
-  if (url === undefined && !error) return <p className="text-slate-500">Loading…</p>
+  // With a saved copy on hand, show it straight away instead of waiting for the link check.
+  if (url === undefined && !error && orders.length === 0) return <p className="text-slate-500">Loading…</p>
 
-  if (!url || editingUrl) {
+  if ((!url && url !== undefined) || editingUrl) {
     return (
       <div className="space-y-6">
         <h1 className="page-title">Sales Orders</h1>
@@ -113,16 +93,17 @@ export function SalesOrdersPage() {
               setShown(PAGE_SIZE)
             }}
           />
-          <button className="btn-secondary" onClick={loadSheet} disabled={loading}>
+          <button className="btn-secondary" onClick={() => refreshSalesOrders(true)} disabled={loading}>
             {loading ? 'Loading…' : 'Refresh'}
           </button>
           <span className="text-xs text-slate-400">
-            {loadedAt && `${orders.length.toLocaleString()} rows · loaded ${loadedAt.toLocaleTimeString()}`}
+            {loadedAt && `${orders.length.toLocaleString()} rows · loaded ${loadedAt.toLocaleString()}`}
+            {loading && orders.length > 0 && ' · updating…'}
           </span>
           <button
             className="text-xs text-blue-600 underline ml-auto"
             onClick={() => {
-              setUrlDraft(url)
+              setUrlDraft(url ?? '')
               setEditingUrl(true)
             }}
           >

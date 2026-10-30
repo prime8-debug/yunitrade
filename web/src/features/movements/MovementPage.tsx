@@ -336,6 +336,25 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
           {message && <p className="-mt-1">{messageText}</p>}
           {jobOrderList}
         </form>
+      ) : config.table === 'receipts' ? (
+        // Received layout: Item, Description, Quantity, Width, Length, Date, MRR No. on top;
+        // Supplier, Remarks and the buttons underneath.
+        <form onSubmit={submit} className="card p-5 space-y-4">
+          <div className="flex flex-wrap items-start gap-4">
+            {itemField('flex-1 min-w-64')}
+            {descriptionField('flex-1 min-w-64')}
+            {quantityField('w-32')}
+            {widthField('w-32')}
+            {lengthField('w-32')}
+            {dateField('w-40')}
+            {config.fields.slice(0, 1).map((f, n) => renderExtraField(f, n, 'w-64'))}
+          </div>
+          <div className="flex flex-wrap items-end gap-4">
+            {config.fields.slice(1).map((f, n) => renderExtraField(f, n + 1, 'w-64'))}
+            {actions('flex flex-wrap items-center gap-3', false)}
+          </div>
+          {message && <p className="-mt-1">{messageText}</p>}
+        </form>
       ) : (
         <form onSubmit={submit} className="card p-5 grid gap-4 md:grid-cols-2 lg:grid-cols-6">
           {itemField('md:col-span-2 lg:col-span-3')}

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { clearSalesOrdersCache } from '../lib/useSalesOrders'
 import type { Profile } from '../lib/types'
 
 interface AuthState {
@@ -61,6 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     isAdmin: profile?.role === 'ADMIN' && profile.active,
     signOut: async () => {
+      await clearSalesOrdersCache()
       await supabase.auth.signOut()
     },
   }

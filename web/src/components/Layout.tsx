@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
+import { refreshSalesOrders } from '../lib/useSalesOrders'
 
 interface NavEntry {
   to: string
@@ -28,6 +29,12 @@ export function Layout() {
   const { profile, isAdmin, signOut } = useAuth()
   const [open, setOpen] = useState(false)
   const entries = NAV.filter((n) => !n.adminOnly || isAdmin)
+
+  // Start loading the Sales Order sheet as soon as an admin is in, so Sales Orders and the
+  // Withdrawal No. suggestions are usually ready before they're opened.
+  useEffect(() => {
+    if (isAdmin) refreshSalesOrders()
+  }, [isAdmin])
 
   return (
     <div className="min-h-screen bg-slate-100 md:flex">
