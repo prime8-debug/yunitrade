@@ -38,7 +38,7 @@ export function WithdrawPage() {
       {tab === 'roll' && <MovementPage key="withdraw-roll" config={WITHDRAW} hideTitle />}
       {tab === 'split' && <SplitWithdrawPage key="withdraw-split" />}
       {tab === 'yards' && <RollLedgerPanel key="withdraw-yards" config={YARDS} mode="withdraw" />}
-      {tab === 'partial' && <RollLedgerPanel key="withdraw-partial" config={PARTIAL} />}
+      {tab === 'partial' && <RollLedgerPanel key="withdraw-partial" config={PARTIAL} mode="withdraw" />}
     </div>
   )
 }
