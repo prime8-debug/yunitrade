@@ -78,9 +78,6 @@ export function SalesOrdersPage() {
   return (
     <div className="space-y-6">
       <h1 className="page-title">Sales Orders</h1>
-      <p className="-mt-4 text-sm text-slate-500">
-        Read-only, live from the Google Sheet — edit orders there. Google refreshes the published copy about every 5 minutes.
-      </p>
 
       <div>
         <div className="flex flex-wrap items-center gap-3 mb-2">
