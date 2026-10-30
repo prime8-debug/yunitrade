@@ -120,7 +120,11 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
     setCreateMsg(null)
     const [{ data: stock }, { data: summary }] = await Promise.all([
       supabase.from('current_stock').select('*').eq('item_id', r.item_id).single(),
-      supabase.from('yards_stock_summary').select('total_received, width').eq('roll_id', r.roll_id).single(),
+      supabase
+        .from(config.summaryView)
+        .select(config.hasWidth ? 'total_received, width' : 'total_received')
+        .eq('roll_id', r.roll_id)
+        .single<{ total_received: number; width?: number | null }>(),
     ])
     if (!stock || !summary) return setCreateMsg({ kind: 'error', text: 'Could not load that roll.' })
     setEditing(r)
@@ -144,8 +148,8 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
         p_roll_id: editing.roll_id,
         p_roll_no: newRollNo.trim() || null,
         p_item_id: newItem.item_id,
-        p_received_yards: n,
-        p_width: newWidth === '' ? null : Number(newWidth),
+        [config.editQtyParam ?? config.createQtyParam]: n,
+        ...(config.hasWidth ? { p_width: newWidth === '' ? null : Number(newWidth) } : {}),
       })
       setCreating(false)
       if (error) return setCreateMsg({ kind: 'error', text: errorMessage(error) })

@@ -18,7 +18,7 @@ export const NAV: NavEntry[] = [
   { to: '/received', label: 'Received' },
   { to: '/sales-orders', label: 'Sales Orders', adminOnly: true },
   { to: '/yards', label: 'Yards Stock' },
-  { to: '/partial-rolls', label: 'Partial Rolls', soon: true },
+  { to: '/partial-rolls', label: 'Partial Rolls' },
   { to: '/search', label: 'Search', soon: true },
   { to: '/items', label: 'Items', adminOnly: true },
   { to: '/audit', label: 'Audit', adminOnly: true, soon: true },

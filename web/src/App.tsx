@@ -9,6 +9,7 @@ import { SalesOrdersPage } from './features/sales-orders/SalesOrdersPage'
 import { StocksPage } from './features/stocks/StocksPage'
 import { WithdrawPage } from './features/withdraw/WithdrawPage'
 import { YardsStockPage } from './features/yards/YardsStockPage'
+import { PartialRollsPage } from './features/partial/PartialRollsPage'
 import { supabaseConfigured } from './lib/supabase'
 import { ComingSoon } from './pages/ComingSoon'
 import { LoginPage } from './pages/LoginPage'
@@ -41,6 +42,7 @@ function Gate() {
         <Route path="items" element={isAdmin ? <ItemsPage /> : <Navigate to="/" />} />
         <Route path="sales-orders" element={isAdmin ? <SalesOrdersPage /> : <Navigate to="/" />} />
         <Route path="yards" element={<YardsStockPage />} />
+        <Route path="partial-rolls" element={<PartialRollsPage />} />
         {NAV.filter((n) => n.soon).map((n) => (
           <Route key={n.to} path={n.to.slice(1)} element={<ComingSoon title={n.label} />} />
         ))}

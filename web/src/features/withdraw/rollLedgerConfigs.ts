@@ -10,8 +10,11 @@ export interface RollLedgerConfig {
   createQtyParam: 'p_received_yards' | 'p_quantity'
   withdrawRpc: 'withdraw_yards' | 'withdraw_partial_roll'
   rollIdParam: 'p_roll_id' | 'p_partial_roll_id'
-  /** ADMIN-only RPC to correct a roll's number / item / received quantity (Yards only). */
-  editRpc?: 'update_yards_roll'
+  /** ADMIN-only RPC to correct a roll's number / item / starting quantity. */
+  editRpc?: 'update_yards_roll' | 'update_partial_roll'
+  editQtyParam?: 'p_received_yards' | 'p_quantity'
+  /** Per-roll totals (received / withdrawn / balance), used to load a roll for editing. */
+  summaryView: 'yards_stock_summary' | 'partial_stock_summary'
   /** Roll has its own Width box (Yards only); defaults to the item's catalog width. */
   hasWidth?: boolean
 }
@@ -28,6 +31,8 @@ export const YARDS: RollLedgerConfig = {
   withdrawRpc: 'withdraw_yards',
   rollIdParam: 'p_roll_id',
   editRpc: 'update_yards_roll',
+  editQtyParam: 'p_received_yards',
+  summaryView: 'yards_stock_summary',
   hasWidth: true,
 }
 
@@ -42,4 +47,7 @@ export const PARTIAL: RollLedgerConfig = {
   createQtyParam: 'p_quantity',
   withdrawRpc: 'withdraw_partial_roll',
   rollIdParam: 'p_partial_roll_id',
+  editRpc: 'update_partial_roll',
+  editQtyParam: 'p_quantity',
+  summaryView: 'partial_stock_summary',
 }

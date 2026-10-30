@@ -1,0 +1,75 @@
+-- =====================================================================
+-- Partial Rolls page: a per-roll stock summary and ADMIN editing of a
+-- roll (Roll No., item, starting quantity), like Yards Stock has.
+--
+--   - partial_stock_summary view
+--   - update_partial_roll(p_roll_id, p_roll_no, p_item_id, p_quantity)
+--
+-- Safe to run more than once.
+-- =====================================================================
+create or replace view public.partial_stock_summary
+with (security_invoker = true)
+as
+select
+  r.id as roll_id,
+  r.roll_no,
+  i.item_code,
+  i.description,
+  i.uom,
+  r.active,
+  -- Reversals count against the type of the entry they undo.
+  coalesce(sum(t.quantity) filter (where coalesce(o.transaction_type, t.transaction_type) = 'CREATED'), 0) as total_received,
+  coalesce(-sum(t.quantity) filter (where coalesce(o.transaction_type, t.transaction_type) = 'WITHDRAWAL'), 0) as total_withdrawn,
+  coalesce(sum(t.quantity), 0) as available_balance
+from public.partial_rolls r
+join public.items i on i.id = r.item_id
+left join public.partial_roll_transactions t on t.partial_roll_id = r.id
+left join public.partial_roll_transactions o on o.id = t.reversal_of
+group by r.id, i.id;
+
+create or replace function public.update_partial_roll(
+  p_roll_id uuid, p_roll_no text, p_item_id uuid, p_quantity numeric
+) returns void
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_roll partial_rolls%rowtype;
+  v_created_id uuid;
+  v_old_qty numeric;
+  v_balance numeric;
+  v_new_no text := nullif(trim(p_roll_no), '');
+begin
+  if not public.is_admin() then raise exception 'Only ADMIN can edit a partial roll'; end if;
+  if p_quantity is null or p_quantity <= 0 then raise exception 'Quantity must be greater than 0'; end if;
+
+  select * into v_roll from partial_rolls where id = p_roll_id for update;
+  if not found then raise exception 'Partial roll not found'; end if;
+  if not exists (select 1 from items where id = p_item_id) then raise exception 'Item not found'; end if;
+
+  select id, quantity into v_created_id, v_old_qty
+  from partial_roll_transactions
+  where partial_roll_id = p_roll_id and transaction_type = 'CREATED' and reversal_of is null
+  order by created_at limit 1;
+  if v_created_id is null then raise exception 'This partial roll has no starting entry to edit'; end if;
+
+  select coalesce(sum(quantity), 0) into v_balance from partial_roll_transactions where partial_roll_id = p_roll_id;
+  if v_balance - v_old_qty + p_quantity < 0 then
+    raise exception 'Quantity cannot be lower than what was already withdrawn (balance would be %)',
+      v_balance - v_old_qty + p_quantity;
+  end if;
+
+  update partial_rolls set roll_no = v_new_no, item_id = p_item_id where id = p_roll_id;
+  update partial_roll_transactions set quantity = p_quantity where id = v_created_id;
+
+  insert into audit_logs (user_id, action, entity_type, entity_id, old_data, new_data)
+  values (auth.uid(), 'UPDATE', 'partial_rolls', p_roll_id,
+          jsonb_build_object('roll_no', v_roll.roll_no, 'item_id', v_roll.item_id, 'quantity', v_old_qty),
+          jsonb_build_object('roll_no', v_new_no, 'item_id', p_item_id, 'quantity', p_quantity));
+exception
+  when unique_violation then
+    raise exception 'Roll No. % is already used by another partial roll.', v_new_no;
+end;
+$$;
+
+revoke execute on function public.update_partial_roll from anon, public;
+grant execute on function public.update_partial_roll to authenticated;
