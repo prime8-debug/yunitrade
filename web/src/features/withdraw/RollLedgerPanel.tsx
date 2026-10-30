@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { ItemPicker } from '../../components/ItemPicker'
 import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
+import { isSuggestionPick, matchJobOrders, useSalesOrders } from '../../lib/useSalesOrders'
 import { formatQty, type StockRow } from '../../lib/types'
 import type { RollLedgerConfig } from './rollLedgerConfigs'
 
@@ -53,6 +54,18 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
   const qtyRef = useRef<HTMLInputElement>(null)
   const [customer, setCustomer] = useState('')
   const [withdrawalNo, setWithdrawalNo] = useState('')
+  const remarksRef = useRef<HTMLInputElement>(null)
+  // Withdrawal No. suggests Job Orders from the Sales Orders sheet; picking one fills Customer (same as Roll / PC).
+  const salesOrders = useSalesOrders()
+  const jobOrderSuggestions = useMemo(() => matchJobOrders(salesOrders, withdrawalNo), [salesOrders, withdrawalNo])
+
+  function changeWithdrawalNo(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value
+    setWithdrawalNo(value)
+    const match = jobOrderSuggestions.find((o) => o.jobOrder.toLowerCase() === value.trim().toLowerCase())
+    if (match?.customer) setCustomer(match.customer)
+    if (match && isSuggestionPick(e)) setTimeout(() => remarksRef.current?.focus(), 0)
+  }
   // Yards: each roll's width (its own, else the item's), shown read-only as "Roll Width".
   const [rollWidths, setRollWidths] = useState<Record<string, string>>({})
   const [remarks, setRemarks] = useState('')
@@ -352,7 +365,24 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
             </label>
             <label className="w-60">
               <span className="label">Withdrawal No.</span>
-              <input className="input" value={withdrawalNo} onChange={(e) => setWithdrawalNo(e.target.value)} />
+              <input
+                className="input"
+                list="roll-job-order-suggestions"
+                autoComplete="off"
+                value={withdrawalNo}
+                onChange={changeWithdrawalNo}
+                onKeyDown={(e) => {
+                  // Enter moves on to Remarks instead of submitting the withdrawal.
+                  if (e.key !== 'Enter') return
+                  e.preventDefault()
+                  remarksRef.current?.focus()
+                }}
+              />
+              <datalist id="roll-job-order-suggestions">
+                {jobOrderSuggestions.map((o) => (
+                  <option key={o.jobOrder} value={o.jobOrder} label={[o.customer, o.itemId, o.quantity].filter(Boolean).join(' · ')} />
+                ))}
+              </datalist>
             </label>
             <label className="w-60">
               <span className="label">Customer</span>
@@ -369,7 +399,7 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
             </button>
             <label className="w-96">
               <span className="label">Remarks</span>
-              <input className="input" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+              <input ref={remarksRef} className="input" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
             </label>
           </div>
           {saveMsg && <p className={`text-sm ${saveMsg.kind === 'ok' ? 'text-green-700' : 'text-red-600'}`}>{saveMsg.text}</p>}

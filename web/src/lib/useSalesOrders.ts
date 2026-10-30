@@ -30,6 +30,28 @@ function loadSalesOrders(): Promise<OrderRow[]> {
   return inflight
 }
 
+/** Job Orders matching what's typed in a Withdrawal No. box (prefix matches first, one per Job Order, max 15). */
+export function matchJobOrders(orders: OrderRow[], typed: string): OrderRow[] {
+  const q = typed.trim().toLowerCase()
+  if (q.length < 2) return []
+  const seen = new Set<string>()
+  const starts: OrderRow[] = []
+  const contains: OrderRow[] = []
+  for (const o of orders) {
+    const j = o.jobOrder.toLowerCase()
+    if (seen.has(j) || !j.includes(q)) continue
+    seen.add(j)
+    ;(j.startsWith(q) ? starts : contains).push(o)
+  }
+  return [...starts, ...contains].slice(0, 15)
+}
+
+/** True when a Withdrawal No. change came from picking a browser suggestion rather than typing. */
+export function isSuggestionPick(e: { nativeEvent: Event }): boolean {
+  const inputType = (e.nativeEvent as InputEvent).inputType
+  return inputType === 'insertReplacementText' || inputType === undefined
+}
+
 /** Sales orders from the Google Sheet for autocomplete; empty until loaded, or if unavailable. */
 export function useSalesOrders(): OrderRow[] {
   const [orders, setOrders] = useState<OrderRow[]>(cache?.orders ?? [])

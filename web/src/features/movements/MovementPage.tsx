@@ -5,7 +5,7 @@ import { ItemsCatalog } from '../../components/ItemsCatalog'
 import { BeginningAdjustmentLog } from './BeginningAdjustmentLog'
 import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
-import { useSalesOrders } from '../../lib/useSalesOrders'
+import { isSuggestionPick, matchJobOrders, useSalesOrders } from '../../lib/useSalesOrders'
 import { formatQty, type StockRow } from '../../lib/types'
 import type { MovementConfig } from './configs'
 
@@ -59,20 +59,11 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
   const coreNoRef = useRef<HTMLInputElement>(null)
   const salesOrders = useSalesOrders()
   // Withdrawal No. suggestions: Job Orders from the Sales Orders sheet matching what's typed (prefix matches first).
-  const typedNo = (extra.withdrawal_no ?? '').trim().toLowerCase()
-  const jobOrderSuggestions = useMemo(() => {
-    if (config.table !== 'withdrawals' || typedNo.length < 2) return []
-    const seen = new Set<string>()
-    const starts: typeof salesOrders = []
-    const contains: typeof salesOrders = []
-    for (const o of salesOrders) {
-      const j = o.jobOrder.toLowerCase()
-      if (seen.has(j) || !j.includes(typedNo)) continue
-      seen.add(j)
-      ;(j.startsWith(typedNo) ? starts : contains).push(o)
-    }
-    return [...starts, ...contains].slice(0, 15)
-  }, [config.table, typedNo, salesOrders])
+  const typedNo = extra.withdrawal_no ?? ''
+  const jobOrderSuggestions = useMemo(
+    () => (config.table === 'withdrawals' ? matchJobOrders(salesOrders, typedNo) : []),
+    [config.table, typedNo, salesOrders],
+  )
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
   const [recent, setRecent] = useState<RecentRow[]>([])
@@ -218,8 +209,7 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
                   if (match?.customer) next.customer = match.customer
                   // The browser's suggestion list swallows the Enter that picks a Job Order, so move on to Remarks
                   // right when a suggestion is chosen (a pick arrives as a replacement, not typed characters).
-                  const inputType = (e.nativeEvent as InputEvent).inputType
-                  if (match && (inputType === 'insertReplacementText' || inputType === undefined)) {
+                  if (match && isSuggestionPick(e)) {
                     const remarks = e.currentTarget.form?.querySelector<HTMLInputElement>('[data-field="remarks"]')
                     setTimeout(() => remarks?.focus(), 0)
                   }
