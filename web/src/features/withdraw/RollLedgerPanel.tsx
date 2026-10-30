@@ -20,6 +20,13 @@ interface RollRow {
   [remainingField: string]: unknown
 }
 
+interface RollSize {
+  width: number | null
+  width_unit: string | null
+  length: number | null
+  length_unit: string | null
+}
+
 /**
  * Shared UI for 3M Yards and Partial Rolls: create a roll with a starting
  * quantity, then withdraw from it over time. Deliberately its own ledger,
@@ -69,6 +76,8 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
   }
   // Yards: each roll's width (its own, else the item's), shown read-only as "Roll Width".
   const [rollWidths, setRollWidths] = useState<Record<string, string>>({})
+  // Partial: each roll's own Width / Length, shown in the rolls list.
+  const [rollSizes, setRollSizes] = useState<Record<string, RollSize>>({})
   const [remarks, setRemarks] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
@@ -84,7 +93,13 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
       }
       setRollWidths(map)
     }
-  }, [config.stockView, config.hasWidth])
+    if (config.hasSize) {
+      const { data: sizes } = await supabase.from(config.summaryView).select('roll_id, width, width_unit, length, length_unit')
+      const map: Record<string, RollSize> = {}
+      for (const r of (sizes as ({ roll_id: string } & RollSize)[]) ?? []) map[r.roll_id] = r
+      setRollSizes(map)
+    }
+  }, [config.stockView, config.hasWidth, config.hasSize, config.summaryView])
   useEffect(() => {
     load()
   }, [load])
@@ -450,6 +465,14 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
                 <th>Item Code</th>
                 <th>Description</th>
                 <th>Roll No.</th>
+                {config.hasSize && (
+                  <>
+                    <th className="text-right">Width</th>
+                    <th>W-UM</th>
+                    <th className="text-right">Length</th>
+                    <th>L-UM</th>
+                  </>
+                )}
                 <th>UOM</th>
                 <th className="text-right">Remaining</th>
                 {canEdit && <th />}
@@ -461,6 +484,14 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
                   <td className="font-mono font-semibold">{r.item_code}</td>
                   <td>{r.description}</td>
                   <td>{r.roll_no}</td>
+                  {config.hasSize && (
+                    <>
+                      <td className="text-right">{rollSizes[r.roll_id]?.width}</td>
+                      <td>{rollSizes[r.roll_id]?.width_unit}</td>
+                      <td className="text-right">{rollSizes[r.roll_id]?.length}</td>
+                      <td>{rollSizes[r.roll_id]?.length_unit}</td>
+                    </>
+                  )}
                   <td>{r.uom}</td>
                   <td className={`text-right font-semibold ${remaining(r) <= 0 ? 'text-red-600' : ''}`}>{formatQty(remaining(r))}</td>
                   {canEdit && (
@@ -474,7 +505,7 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
               ))}
               {visibleRolls.length === 0 && (
                 <tr>
-                  <td colSpan={canEdit ? 6 : 5} className="text-center text-slate-400 py-6">
+                  <td colSpan={(canEdit ? 6 : 5) + (config.hasSize ? 4 : 0)} className="text-center text-slate-400 py-6">
                     {rolls.length === 0 ? 'No rolls yet — add one above.' : 'No rolls match that filter.'}
                   </td>
                 </tr>
