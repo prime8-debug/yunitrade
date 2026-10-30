@@ -262,7 +262,7 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
       {showWithdraw && (
       <div className="card p-5">
         <h2 className="font-semibold text-slate-700 mb-3">Withdraw {config.title}</h2>
-        {/* Row 1: Core No., Item, Roll Width, qty, Withdrawal No., Customer, Date. Row 2: button + Remarks. */}
+        {/* Row 1: Core No., Item, Roll Width, qty, Withdrawal No., Customer, Date. Row 2: Remarks + button. */}
         <form onSubmit={withdraw} className="space-y-4">
           <div className="flex flex-wrap items-start gap-4">
             <label className="w-28">
@@ -394,13 +394,13 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
             </label>
           </div>
           <div className="flex flex-wrap items-end gap-4">
-            <button className="btn-primary" disabled={saving || overStock}>
-              {saving ? 'Saving…' : `Withdraw ${config.unitLabel}`}
-            </button>
             <label className="w-96">
               <span className="label">Remarks</span>
               <input ref={remarksRef} className="input" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
             </label>
+            <button className="btn-primary" disabled={saving || overStock}>
+              {saving ? 'Saving…' : `Withdraw ${config.unitLabel}`}
+            </button>
           </div>
           {saveMsg && <p className={`text-sm ${saveMsg.kind === 'ok' ? 'text-green-700' : 'text-red-600'}`}>{saveMsg.text}</p>}
         </form>
