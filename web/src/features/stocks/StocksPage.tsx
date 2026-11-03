@@ -12,24 +12,16 @@ export function StocksPage() {
   const [hideZero, setHideZero] = useState(false)
   const [selected, setSelected] = useState<StockRow | null>(null)
 
-  // Average withdrawn per calendar month, by item (see item_withdrawal_average).
-  const [averages, setAverages] = useState<Record<string, { avg: number; months: number }>>({})
+  // Average per month = Withdrawn ÷ this month's number (Jan = 1 … Nov = 11, Dec = 12).
+  const monthNo = new Date().getMonth() + 1
 
   const load = useCallback(async () => {
-    const [{ data, error }, { data: avgData }] = await Promise.all([
-      supabase.from('current_stock').select('*').eq('active', true).order('item_code'),
-      supabase.from('item_withdrawal_average').select('item_id, avg_per_month, months'),
-    ])
+    const { data, error } = await supabase.from('current_stock').select('*').eq('active', true).order('item_code')
     if (error) setError(errorMessage(error))
     else {
       setError(null)
       setRows(data as StockRow[])
     }
-    const map: Record<string, { avg: number; months: number }> = {}
-    for (const a of (avgData as { item_id: string; avg_per_month: number; months: number }[]) ?? []) {
-      map[a.item_id] = { avg: Number(a.avg_per_month), months: a.months }
-    }
-    setAverages(map)
     setLoading(false)
   }, [])
 
@@ -76,7 +68,7 @@ export function StocksPage() {
               <th className="text-right">Beginning</th>
               <th className="text-right">Received</th>
               <th className="text-right">Withdrawn</th>
-              <th className="text-right" title="Total withdrawn per calendar month, averaged from the item's first month">
+              <th className="text-right" title={`Withdrawn ÷ ${monthNo} (this month's number)`}>
                 Average per Month
               </th>
               <th className="text-right">On Hand</th>
@@ -109,12 +101,7 @@ export function StocksPage() {
                 <td className="text-right">{formatQty(r.beginning)}</td>
                 <td className="text-right">{formatQty(r.received)}</td>
                 <td className="text-right">{formatQty(r.withdrawn)}</td>
-                <td
-                  className="text-right"
-                  title={averages[r.item_id] ? `Over ${averages[r.item_id].months} month${averages[r.item_id].months === 1 ? '' : 's'}` : undefined}
-                >
-                  {averages[r.item_id] ? formatQty(averages[r.item_id].avg) : ''}
-                </td>
+                <td className="text-right">{formatQty(Math.round((Number(r.withdrawn) / monthNo) * 100) / 100)}</td>
                 <td className={`text-right font-semibold ${Number(r.on_hand) <= 0 ? 'text-red-600' : ''}`}>{formatQty(r.on_hand)}</td>
               </tr>
             ))}
