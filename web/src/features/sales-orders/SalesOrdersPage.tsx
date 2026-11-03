@@ -116,6 +116,7 @@ export function SalesOrdersPage() {
                 <th>Item ID</th>
                 <th>Item Description</th>
                 <th className="text-right">Quantity</th>
+                <th>Unit</th>
                 <th className="text-right">Width</th>
                 <th>Unit (W)</th>
                 <th className="text-right">Length</th>
@@ -131,6 +132,7 @@ export function SalesOrdersPage() {
                   <td className="font-mono whitespace-nowrap">{o.itemId}</td>
                   <td>{o.itemDescription}</td>
                   <td className="text-right">{o.quantity && !isNaN(Number(o.quantity)) ? formatQty(Number(o.quantity)) : o.quantity}</td>
+                  <td>{o.unit}</td>
                   <td className="text-right">{o.width}</td>
                   <td>{o.widthUnit}</td>
                   <td className="text-right">{o.length}</td>
@@ -141,7 +143,7 @@ export function SalesOrdersPage() {
               ))}
               {visible.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="text-center text-slate-400 py-6">
+                  <td colSpan={11} className="text-center text-slate-400 py-6">
                     {loading ? 'Loading…' : orders.length === 0 ? 'No orders in the sheet.' : 'No orders match that filter.'}
                   </td>
                 </tr>
