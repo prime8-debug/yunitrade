@@ -128,6 +128,24 @@ export function AutoWithdrawals() {
     loadActivity()
   }
 
+  async function voidListed() {
+    // The orders still match, so the job would post them again on its next run.
+    if (enabled) return setError('Turn off automatic withdrawals first, or these orders will post again within 5 minutes.')
+    const n = posts.length
+    if (!window.confirm(`Void these ${n} automatic withdrawal${n === 1 ? '' : 's'}? Stock is added back and they leave the Withdraw page.`)) return
+    setBusy(true)
+    setMessage(null)
+    const failures: string[] = []
+    for (const p of posts) {
+      const { error } = await supabase.rpc('void_entry', { p_reference_type: 'withdrawals', p_reference_id: p.id, p_reason: 'Cleared from Automation' })
+      if (error) failures.push(`${p.withdrawal_no}: ${errorMessage(error)}`)
+    }
+    setBusy(false)
+    setError(failures.length ? `${failures.length} not voided — ${failures[0]}` : null)
+    setMessage(`Voided ${n - failures.length}. They post again if automation is turned on with a start date on or before their dates.`)
+    loadActivity()
+  }
+
   if (loading) return <p className="text-slate-500">Loading…</p>
 
   const lastRun = runs[0]
@@ -230,7 +248,14 @@ export function AutoWithdrawals() {
       </section>
 
       <section>
-        <h2 className="font-semibold mb-2">Recent automatic withdrawals</h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="font-semibold">Recent automatic withdrawals</h2>
+          {posts.length > 0 && (
+            <button className="text-xs text-red-600 underline" disabled={busy} onClick={voidListed}>
+              Clear (void these)
+            </button>
+          )}
+        </div>
         <div className="card overflow-x-auto">
           <table className="table">
             <thead>
