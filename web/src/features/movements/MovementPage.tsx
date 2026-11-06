@@ -24,7 +24,6 @@ interface RecentRow {
   id: string
   entry_date: string
   quantity: number
-  voided_at: string | null
   // The entry's own description/size (added after some records already existed —
   // those fall back to the item's defaults, shown via the joined `item` below).
   description: string | null
@@ -87,7 +86,8 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
 
   const loadRecent = useCallback(async () => {
     if (config.showCatalog || year === undefined) return
-    const query = supabase.from(config.table).select('*, item:items(item_code, description, width, width_unit, length, length_unit)')
+    // Voided entries drop off this list; they stay in the item's history in Stocks.
+    const query = supabase.from(config.table).select('*, item:items(item_code, description, width, width_unit, length, length_unit)').is('voided_at', null)
     const { data } = await (year ? query.or(yearFilter(year)) : query).order('created_at', { ascending: false }).limit(50)
     setRecent((data as RecentRow[]) ?? [])
   }, [config.table, config.showCatalog, year])
@@ -407,7 +407,7 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
               </thead>
               <tbody>
                 {visibleRecent.map((r) => (
-                  <tr key={r.id} className={r.voided_at ? 'opacity-50 line-through' : ''}>
+                  <tr key={r.id}>
                     <td className="whitespace-nowrap">{r.entry_date}</td>
                     <td>
                       <span className="font-mono font-semibold">{r.item?.item_code}</span>{' '}
@@ -422,14 +422,10 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
                       <td key={f.name}>{String(r[f.name] ?? '')}</td>
                     ))}
                     <td className="text-right whitespace-nowrap no-underline">
-                      {r.voided_at ? (
-                        <span className="badge">VOID</span>
-                      ) : (
-                        isAdmin && (
-                          <button className="text-xs text-red-600 underline" onClick={() => voidEntry(r)}>
-                            Void
-                          </button>
-                        )
+                      {isAdmin && (
+                        <button className="text-xs text-red-600 underline" onClick={() => voidEntry(r)}>
+                          Void
+                        </button>
                       )}
                     </td>
                   </tr>
