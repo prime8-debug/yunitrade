@@ -2,12 +2,21 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { errorMessage, supabase } from '../../lib/supabase'
 import { formatQty } from '../../lib/types'
 import { refreshSalesOrders, useSalesOrdersState } from '../../lib/useSalesOrders'
+import { ApplyWithdrawals } from './ApplyWithdrawals'
 
 const SETTING_KEY = 'sales_sheet_csv_url'
 const PAGE_SIZE = 200
 
+type SubTab = 'orders' | 'apply'
+
+const TABS: { id: SubTab; label: string }[] = [
+  { id: 'orders', label: 'Sales Orders' },
+  { id: 'apply', label: 'Apply Withdrawals' },
+]
+
 /** ADMIN-only, read-only view of the Sales Order Google Sheet (via its "Publish to web" CSV link). */
 export function SalesOrdersPage() {
+  const [tab, setTab] = useState<SubTab>('orders')
   const [url, setUrl] = useState<string | null | undefined>(undefined) // undefined = still loading the setting
   const [editingUrl, setEditingUrl] = useState(false)
   const [urlDraft, setUrlDraft] = useState('')
@@ -79,6 +88,21 @@ export function SalesOrdersPage() {
     <div className="space-y-6">
       <h1 className="page-title">Sales Orders</h1>
 
+      <div className="flex gap-1 border-b border-slate-200">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
+              tab === t.id ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'apply' ? <ApplyWithdrawals /> : (
       <div>
         <div className="flex flex-wrap items-center gap-3 mb-2">
           <input
@@ -157,6 +181,7 @@ export function SalesOrdersPage() {
           </button>
         )}
       </div>
+      )}
     </div>
   )
 }

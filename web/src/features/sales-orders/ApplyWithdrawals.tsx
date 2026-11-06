@@ -1,0 +1,361 @@
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { errorMessage, supabase } from '../../lib/supabase'
+import { formatQty, type StockRow } from '../../lib/types'
+import { refreshSalesOrders, useSalesOrdersState } from '../../lib/useSalesOrders'
+import { buildPlan, parseSize, toLookup, withdrawnKey, type LookupRow, type PlanRow, type YardsRoll } from './salesWithdrawals'
+
+const LOOKUP_KEY = 'item_lookup_csv_url'
+const REMARK = 'From Sales Orders'
+
+const today = () => new Date().toLocaleDateString('en-CA')
+
+const STATE_STYLE: Record<PlanRow['state'], string> = {
+  ready: 'text-green-700',
+  input: 'text-amber-700',
+  blocked: 'text-red-600',
+  done: 'text-slate-400',
+}
+
+/** "JOBORDER|item_id" pairs with a live (not voided) withdrawal, from main stock or Yards. */
+async function loadWithdrawn(jobOrders: string[], rolls: YardsRoll[]): Promise<Set<string>> {
+  const done = new Set<string>()
+  if (jobOrders.length === 0) return done
+
+  const { data: main, error } = await supabase
+    .from('withdrawals')
+    .select('withdrawal_no, item_id')
+    .in('withdrawal_no', jobOrders)
+    .is('voided_at', null)
+  if (error) throw new Error(errorMessage(error))
+  for (const w of main ?? []) done.add(withdrawnKey(w.withdrawal_no, w.item_id))
+
+  const { data: yards, error: yardsError } = await supabase
+    .from('yards_transactions')
+    .select('id, roll_id, withdrawal_no')
+    .in('withdrawal_no', jobOrders)
+    .eq('transaction_type', 'WITHDRAWAL')
+  if (yardsError) throw new Error(errorMessage(yardsError))
+  const { data: reversals } = await supabase
+    .from('yards_transactions')
+    .select('reversal_of')
+    .in('reversal_of', (yards ?? []).map((y) => y.id))
+  const reversed = new Set((reversals ?? []).map((r) => r.reversal_of))
+  const rollItem = new Map(rolls.map((r) => [r.roll_id, r.item_id]))
+  for (const y of yards ?? []) {
+    const itemId = rollItem.get(y.roll_id)
+    if (itemId && !reversed.has(y.id)) done.add(withdrawnKey(y.withdrawal_no, itemId))
+  }
+  return done
+}
+
+/** Turns one date's sales orders into withdrawals, after a review. ADMIN-only (inside Sales Orders). */
+export function ApplyWithdrawals() {
+  const { orders, loading: sheetLoading, error: sheetError } = useSalesOrdersState()
+  const [url, setUrl] = useState<string | null | undefined>(undefined)
+  const [editingUrl, setEditingUrl] = useState(false)
+  const [urlDraft, setUrlDraft] = useState('')
+
+  const [lookup, setLookup] = useState<LookupRow[]>([])
+  const [items, setItems] = useState<StockRow[]>([])
+  const [rolls, setRolls] = useState<YardsRoll[]>([])
+  const [withdrawn, setWithdrawn] = useState<Set<string>>(new Set())
+  const [date, setDate] = useState(today)
+  const [itemChoice, setItemChoice] = useState<Record<string, string>>({})
+  const [coreChoice, setCoreChoice] = useState<Record<string, string>>({})
+  const [excluded, setExcluded] = useState<Set<string>>(new Set())
+  const [rowErrors, setRowErrors] = useState<Record<string, string>>({})
+
+  const [loading, setLoading] = useState(true)
+  const [posting, setPosting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
+
+  // Always work from the latest sheet here, not the copy saved in this browser.
+  useEffect(() => {
+    refreshSalesOrders(true)
+  }, [])
+
+  useEffect(() => {
+    supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', LOOKUP_KEY)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) setError(errorMessage(error))
+        setUrl(data?.value || null)
+      })
+  }, [])
+
+  const dayJobOrders = useMemo(() => [...new Set(orders.filter((o) => o.date === date).map((o) => o.jobOrder))], [orders, date])
+
+  const load = useCallback(async () => {
+    if (!url) return
+    setLoading(true)
+    try {
+      const res = await fetch(url, { cache: 'no-store' })
+      if (!res.ok) throw new Error(`Google Sheets returned ${res.status} — is the lookup tab still published to the web?`)
+      const nextLookup = toLookup(await res.text())
+      const [{ data: stock, error: stockError }, { data: rollData, error: rollError }] = await Promise.all([
+        supabase.from('current_stock').select('*').eq('active', true),
+        supabase.from('yards_roll_stock').select('roll_id, roll_no, item_id, item_code, active, remaining_yards'),
+      ])
+      if (stockError || rollError) throw new Error(errorMessage(stockError ?? rollError))
+      const nextRolls = (rollData as YardsRoll[]) ?? []
+      const nextWithdrawn = await loadWithdrawn(dayJobOrders, nextRolls)
+      setLookup(nextLookup)
+      setItems((stock as StockRow[]) ?? [])
+      setRolls(nextRolls)
+      setWithdrawn(nextWithdrawn)
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLoading(false)
+    }
+  }, [url, dayJobOrders])
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const plan = useMemo(
+    () => buildPlan({ orders, lookup, date, items, rolls, withdrawn, itemChoice, coreChoice, excluded }),
+    [orders, lookup, date, items, rolls, withdrawn, itemChoice, coreChoice, excluded],
+  )
+  const toPost = plan.filter((p) => p.state === 'ready' && !excluded.has(p.order.key))
+  const count = (state: PlanRow['state']) => plan.filter((p) => p.state === state).length
+
+  function changeDate(value: string) {
+    setDate(value)
+    setItemChoice({})
+    setCoreChoice({})
+    setExcluded(new Set())
+    setRowErrors({})
+    setMessage(null)
+  }
+
+  function toggleExcluded(key: string) {
+    setExcluded((prev) => {
+      const next = new Set(prev)
+      if (!next.delete(key)) next.add(key)
+      return next
+    })
+  }
+
+  async function saveUrl(e: FormEvent) {
+    e.preventDefault()
+    const value = urlDraft.trim()
+    if (!/^https:\/\/docs\.google\.com\/spreadsheets\/.+output=csv/.test(value)) {
+      return setError('Paste the link from File → Share → Publish to web, with the format set to CSV (it ends in output=csv).')
+    }
+    const { error } = await supabase.from('app_settings').upsert({ key: LOOKUP_KEY, value, updated_at: new Date().toISOString() })
+    if (error) return setError(errorMessage(error))
+    setError(null)
+    setEditingUrl(false)
+    setUrl(value)
+  }
+
+  async function postOne(p: PlanRow) {
+    const { order: o, item, roll, quantity } = p
+    if (roll) {
+      return supabase.rpc('withdraw_yards', {
+        p_roll_id: roll.roll_id,
+        p_quantity: quantity,
+        p_entry_date: date,
+        p_customer: o.customer || null,
+        p_remarks: REMARK,
+        p_withdrawal_no: o.jobOrder,
+      })
+    }
+    return supabase.rpc('post_withdrawal', {
+      p_item_id: item!.item_id,
+      p_quantity: quantity,
+      p_entry_date: date,
+      p_withdrawal_no: o.jobOrder,
+      p_customer: o.customer || null,
+      p_remarks: REMARK,
+      p_width: parseSize(o.width) ?? item!.width,
+      p_width_unit: o.widthUnit || item!.width_unit,
+      p_length: parseSize(o.length) ?? item!.length,
+      p_length_unit: o.lengthUnit || item!.length_unit,
+      p_description: o.itemDescription || item!.description,
+    })
+  }
+
+  async function post() {
+    if (!window.confirm(`Post ${toPost.length} withdrawal${toPost.length === 1 ? '' : 's'} dated ${date}? This reduces stock.`)) return
+    setPosting(true)
+    setMessage(null)
+    const errors: Record<string, string> = {}
+    let posted = 0
+    let skipped = 0
+    try {
+      // Re-check right before posting, in case someone withdrew one of these in the meantime.
+      const latest = await loadWithdrawn(dayJobOrders, rolls)
+      for (const p of toPost) {
+        const itemId = p.roll?.item_id ?? p.item!.item_id
+        if (latest.has(withdrawnKey(p.order.jobOrder, itemId))) {
+          skipped++
+          continue
+        }
+        const { error } = await postOne(p)
+        if (error) errors[p.order.key] = errorMessage(error)
+        else posted++
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    setRowErrors(errors)
+    const failed = Object.keys(errors).length
+    setMessage(
+      [`Posted ${posted}`, skipped ? `${skipped} already withdrawn` : '', failed ? `${failed} failed — see the rows below` : '']
+        .filter(Boolean)
+        .join(' · '),
+    )
+    setPosting(false)
+    await load()
+  }
+
+  if (url === undefined) return <p className="text-slate-500">Loading…</p>
+
+  if (!url || editingUrl) {
+    return (
+      <form onSubmit={saveUrl} className="card p-5 space-y-3 max-w-3xl">
+        <p className="text-sm text-slate-600">
+          In Google Sheets: <b>File → Share → Publish to web</b>, pick the <b>ITEMCODE V2 SBASE</b> tab, choose{' '}
+          <b>Comma-separated values (.csv)</b>, then paste the link here. It's stored ADMIN-only.
+        </p>
+        <input className="input font-mono text-xs" placeholder="https://docs.google.com/spreadsheets/d/e/…/pub?…output=csv" value={urlDraft} onChange={(e) => setUrlDraft(e.target.value)} />
+        <div className="flex items-center gap-3">
+          <button className="btn-primary">Save link</button>
+          {url && (
+            <button type="button" className="btn-secondary" onClick={() => setEditingUrl(false)}>
+              Cancel
+            </button>
+          )}
+          {error && <span className="text-sm text-red-600">{error}</span>}
+        </div>
+      </form>
+    )
+  }
+
+  const busy = loading || sheetLoading
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-end gap-4 mb-3">
+        <label>
+          <span className="label">Date</span>
+          <input className="input w-44" type="date" value={date} onChange={(e) => changeDate(e.target.value)} />
+        </label>
+        <button className="btn-primary" onClick={post} disabled={posting || busy || toPost.length === 0}>
+          {posting ? 'Posting…' : `Post ${toPost.length} Withdrawal${toPost.length === 1 ? '' : 's'}`}
+        </button>
+        <span className="text-xs text-slate-400 pb-2">
+          {busy
+            ? 'Loading the latest sheets…'
+            : `${count('ready')} ready · ${count('input')} need input · ${count('blocked')} can't post · ${count('done')} already withdrawn`}
+        </span>
+        <button
+          className="text-xs text-blue-600 underline ml-auto pb-2"
+          onClick={() => {
+            setUrlDraft(url)
+            setEditingUrl(true)
+          }}
+        >
+          Change lookup link
+        </button>
+      </div>
+
+      {(error || sheetError) && <p className="text-sm text-red-600 mb-2">{error ?? sheetError}</p>}
+      {message && <p className="text-sm text-green-700 mb-2">{message}</p>}
+
+      <div className="card overflow-x-auto">
+        <table className="table">
+          <thead>
+            <tr>
+              <th />
+              <th>Job Order</th>
+              <th>Customer</th>
+              <th>Sales Order Item</th>
+              <th>Size</th>
+              <th className="text-right">Quantity</th>
+              <th>Unit</th>
+              <th>Status</th>
+              <th>Withdraw From</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            {plan.map((p) => {
+              const { order: o } = p
+              const rowError = rowErrors[o.key]
+              return (
+                <tr key={o.key}>
+                  <td>
+                    {p.state === 'ready' && (
+                      <input
+                        type="checkbox"
+                        aria-label={`Include ${o.jobOrder}`}
+                        checked={!excluded.has(o.key)}
+                        onChange={() => toggleExcluded(o.key)}
+                      />
+                    )}
+                  </td>
+                  <td className="font-mono font-semibold whitespace-nowrap">{o.jobOrder}</td>
+                  <td>{o.customer}</td>
+                  <td>
+                    <div className="font-mono whitespace-nowrap">{o.itemId}</div>
+                    <div className="text-xs text-slate-500">{o.itemDescription}</div>
+                  </td>
+                  <td className="whitespace-nowrap">
+                    {[o.width && `${o.width} ${o.widthUnit}`.trim(), o.length && `${o.length} ${o.lengthUnit}`.trim()].filter(Boolean).join(' × ')}
+                  </td>
+                  <td className="text-right">{formatQty(p.quantity)}</td>
+                  <td>{o.unit}</td>
+                  <td>{o.status}</td>
+                  <td className="whitespace-nowrap">
+                    {p.state !== 'done' && p.target === 'yards' && (
+                      <div className="flex items-center gap-2">
+                        <input
+                          className="input w-24"
+                          placeholder="Core No."
+                          aria-label={`Core No. for ${o.jobOrder}`}
+                          value={coreChoice[o.key] ?? ''}
+                          onChange={(e) => setCoreChoice((c) => ({ ...c, [o.key]: e.target.value }))}
+                        />
+                        <span className="text-xs text-slate-500">{p.roll?.item_code ?? p.candidates.join(' / ')}</span>
+                      </div>
+                    )}
+                    {p.state !== 'done' && p.target === 'stock' && p.candidates.length > 1 && (
+                      <select
+                        className="input"
+                        aria-label={`Item for ${o.jobOrder}`}
+                        value={itemChoice[o.key] ?? ''}
+                        onChange={(e) => setItemChoice((c) => ({ ...c, [o.key]: e.target.value }))}
+                      >
+                        <option value="">Choose…</option>
+                        {p.candidates.map((c) => (
+                          <option key={c}>{c}</option>
+                        ))}
+                      </select>
+                    )}
+                    {p.target === 'stock' && p.candidates.length === 1 && <span className="font-mono">{p.candidates[0]}</span>}
+                  </td>
+                  <td className={`text-sm ${rowError ? 'text-red-600' : STATE_STYLE[p.state]}`}>{rowError ?? (p.note || 'Ready')}</td>
+                </tr>
+              )
+            })}
+            {plan.length === 0 && (
+              <tr>
+                <td colSpan={10} className="text-center text-slate-400 py-6">
+                  {busy ? 'Loading…' : 'No lookup items in the sales orders for this date.'}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}

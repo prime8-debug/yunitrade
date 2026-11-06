@@ -5,6 +5,7 @@ export interface OrderRow {
   date: string
   jobOrder: string
   customer: string
+  status: string
   quantity: string
   unit: string
   width: string
@@ -36,6 +37,7 @@ export function toOrders(text: string): OrderRow[] {
     jobNo: findColumn(headers, 'Job Order No.'),
     subKey: findColumn(headers, 'Job Order SubKey'),
     customer: findColumn(headers, 'Customer Name'),
+    status: findColumn(headers, 'Status'),
     quantity: findColumn(headers, 'QUANTITY'),
     unit: findColumn(headers, 'Unit'),
     width: findColumn(headers, 'WIDTH'),
@@ -57,6 +59,7 @@ export function toOrders(text: string): OrderRow[] {
       date: cell(r, idx.date),
       jobOrder: subKey ? `${jobNo}-${subKey}` : jobNo,
       customer: cell(r, idx.customer),
+      status: cell(r, idx.status),
       quantity: cell(r, idx.quantity),
       unit: cell(r, idx.unit),
       width: cell(r, idx.width),
