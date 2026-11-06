@@ -10,7 +10,6 @@ interface PartialRow {
   roll_no: string | null
   item_code: string
   description: string
-  uom: string | null
   width: number | null
   width_unit: string | null
   length: number | null
@@ -107,7 +106,6 @@ function PartialStockTable() {
               <th>W-UM</th>
               <th className="text-right">Length</th>
               <th>L-UM</th>
-              <th>UOM</th>
               <th className="text-right">Total Received</th>
               <th className="text-right">Total Withdrawn</th>
               <th className="text-right">Available Balance</th>
@@ -123,7 +121,6 @@ function PartialStockTable() {
                 <td>{r.width_unit}</td>
                 <td className="text-right">{r.length}</td>
                 <td>{r.length_unit}</td>
-                <td>{r.uom}</td>
                 <td className="text-right">{formatQty(r.total_received)}</td>
                 <td className="text-right">{formatQty(r.total_withdrawn)}</td>
                 <td className="text-right font-semibold">{formatQty(r.available_balance)}</td>
@@ -131,7 +128,7 @@ function PartialStockTable() {
             ))}
             {!loading && visible.length === 0 && (
               <tr>
-                <td colSpan={11} className="text-center text-slate-400 py-6">
+                <td colSpan={10} className="text-center text-slate-400 py-6">
                   {rows.length === 0 ? 'No partial rolls yet — add one under Add / Edit Partial Roll.' : 'No rolls match that filter.'}
                 </td>
               </tr>

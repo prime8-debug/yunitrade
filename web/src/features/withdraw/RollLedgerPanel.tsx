@@ -15,7 +15,6 @@ interface RollRow {
   item_id: string
   item_code: string
   description: string
-  uom: string | null
   active: boolean
   [remainingField: string]: unknown
 }
@@ -25,6 +24,14 @@ interface RollSize {
   width_unit: string | null
   length: number | null
   length_unit: string | null
+}
+
+interface LatestWithdrawal {
+  roll_id: string
+  yards: number
+  withdrawal_no: string | null
+  customer: string | null
+  transaction_date: string
 }
 
 /**
@@ -38,6 +45,7 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
   const showAdd = mode !== 'withdraw'
   const showWithdraw = mode !== 'add'
   const canEdit = showAdd && isAdmin && !!config.editRpc
+  const showLatest = !!config.hasWidth && showWithdraw
   const [editing, setEditing] = useState<RollRow | null>(null)
   const [rolls, setRolls] = useState<RollRow[]>([])
   const [rollQuery, setRollQuery] = useState('')
@@ -78,6 +86,8 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
   const [rollWidths, setRollWidths] = useState<Record<string, string>>({})
   // Partial: each roll's own Width / Length, shown in the rolls list.
   const [rollSizes, setRollSizes] = useState<Record<string, RollSize>>({})
+  // Withdraw → Yards: each roll's most recent withdrawal, shown in the rolls list.
+  const [latestWithdrawals, setLatestWithdrawals] = useState<Record<string, LatestWithdrawal>>({})
   const [remarks, setRemarks] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
@@ -99,7 +109,13 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
       for (const r of (sizes as ({ roll_id: string } & RollSize)[]) ?? []) map[r.roll_id] = r
       setRollSizes(map)
     }
-  }, [config.stockView, config.hasWidth, config.hasSize, config.summaryView])
+    if (showLatest) {
+      const { data: latest } = await supabase.from('yards_latest_withdrawal').select('*')
+      const map: Record<string, LatestWithdrawal> = {}
+      for (const w of (latest as LatestWithdrawal[]) ?? []) map[w.roll_id] = w
+      setLatestWithdrawals(map)
+    }
+  }, [config.stockView, config.hasWidth, config.hasSize, config.summaryView, showLatest])
   useEffect(() => {
     load()
   }, [load])
@@ -377,7 +393,7 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
                               {r.roll_no && <span className="text-slate-500">· {r.roll_no}</span>}
                             </span>
                             <span className="text-sm text-slate-600 whitespace-nowrap">
-                              {formatQty(remaining(r))} {r.uom}
+                              {formatQty(remaining(r))}
                             </span>
                           </button>
                         </li>
@@ -464,6 +480,17 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
               <tr>
                 <th>Item Code</th>
                 <th>Description</th>
+                {showLatest && (
+                  <>
+                    <th>Roll Width</th>
+                    <th className="text-right" title="Yards on this roll's latest withdrawal">
+                      Yards
+                    </th>
+                    <th>Withdrawal No.</th>
+                    <th>Customer</th>
+                    <th>Date</th>
+                  </>
+                )}
                 <th>Roll No.</th>
                 {config.hasSize && (
                   <>
@@ -473,16 +500,26 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
                     <th>L-UM</th>
                   </>
                 )}
-                <th>UOM</th>
                 <th className="text-right">Remaining</th>
                 {canEdit && <th />}
               </tr>
             </thead>
             <tbody>
-              {visibleRolls.map((r) => (
+              {visibleRolls.map((r) => {
+                const latest = latestWithdrawals[r.roll_id]
+                return (
                 <tr key={r.roll_id}>
                   <td className="font-mono font-semibold">{r.item_code}</td>
                   <td>{r.description}</td>
+                  {showLatest && (
+                    <>
+                      <td className="whitespace-nowrap">{rollWidths[r.roll_id]}</td>
+                      <td className="text-right">{latest && formatQty(latest.yards)}</td>
+                      <td className="font-mono whitespace-nowrap">{latest?.withdrawal_no}</td>
+                      <td>{latest?.customer}</td>
+                      <td className="whitespace-nowrap">{latest?.transaction_date}</td>
+                    </>
+                  )}
                   <td>{r.roll_no}</td>
                   {config.hasSize && (
                     <>
@@ -492,7 +529,6 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
                       <td>{rollSizes[r.roll_id]?.length_unit}</td>
                     </>
                   )}
-                  <td>{r.uom}</td>
                   <td className={`text-right font-semibold ${remaining(r) <= 0 ? 'text-red-600' : ''}`}>{formatQty(remaining(r))}</td>
                   {canEdit && (
                     <td className="text-right">
@@ -502,10 +538,11 @@ export function RollLedgerPanel({ config, mode = 'all' }: { config: RollLedgerCo
                     </td>
                   )}
                 </tr>
-              ))}
+                )
+              })}
               {visibleRolls.length === 0 && (
                 <tr>
-                  <td colSpan={(canEdit ? 6 : 5) + (config.hasSize ? 4 : 0)} className="text-center text-slate-400 py-6">
+                  <td colSpan={(canEdit ? 5 : 4) + (config.hasSize ? 4 : 0) + (showLatest ? 5 : 0)} className="text-center text-slate-400 py-6">
                     {rolls.length === 0 ? 'No rolls yet — add one above.' : 'No rolls match that filter.'}
                   </td>
                 </tr>
