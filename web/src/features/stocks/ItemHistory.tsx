@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
+import { inYear, useStockYear } from '../../lib/useStockYear'
 import { formatQty, type LedgerRow, type StockRow } from '../../lib/types'
 
 /** Ledger for one item, with a running balance: "why is stock what it is?" */
@@ -9,16 +10,18 @@ export function ItemHistory({ item, onClose }: { item: StockRow; onClose: () => 
   const { isAdmin } = useAuth()
   const [rows, setRows] = useState<LedgerRow[]>([])
   const [error, setError] = useState<string | null>(null)
+  const year = useStockYear()
 
   const load = useCallback(async () => {
+    if (year === undefined) return
     const { data } = await supabase
       .from('inventory_transactions')
       .select('*, created_by_profile:profiles(display_name)')
       .eq('item_id', item.item_id)
       .order('transaction_date')
       .order('created_at')
-    setRows((data as LedgerRow[]) ?? [])
-  }, [item.item_id])
+    setRows(((data as LedgerRow[]) ?? []).filter((r) => inYear(year, r.transaction_date, r.created_at)))
+  }, [item.item_id, year])
 
   useEffect(() => {
     load()

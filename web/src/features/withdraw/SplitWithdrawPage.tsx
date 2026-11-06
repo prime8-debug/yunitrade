@@ -3,6 +3,7 @@ import { useAuth } from '../../auth/AuthProvider'
 import { ItemPicker } from '../../components/ItemPicker'
 import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
+import { useStockYear, yearFilter } from '../../lib/useStockYear'
 import { formatQty, formatSize, type StockRow } from '../../lib/types'
 
 const today = () => new Date().toLocaleDateString('en-CA')
@@ -65,6 +66,7 @@ export function SplitWithdrawPage() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
   const [recent, setRecent] = useState<OperationRow[]>([])
+  const year = useStockYear()
   const [recentQuery, setRecentQuery] = useState('')
   const [outputAuto, setOutputAuto] = useState(false)
 
@@ -112,13 +114,13 @@ export function SplitWithdrawPage() {
   const overSourceStock = source != null && sourceCount > Number(source.on_hand)
 
   const loadRecent = useCallback(async () => {
-    const { data, error } = await supabase
+    if (year === undefined) return
+    const query = supabase
       .from('inventory_operations')
       .select(`*, source:items!inventory_operations_source_item_id_fkey(item_code,description,width,width_unit,length,length_unit), output:items!inventory_operations_output_item_id_fkey(item_code,description,width,width_unit,length,length_unit)`)
-      .order('created_at', { ascending: false })
-      .limit(30)
+    const { data, error } = await (year ? query.or(yearFilter(year)) : query).order('created_at', { ascending: false }).limit(30)
     if (!error) setRecent((data as OperationRow[]) ?? [])
-  }, [])
+  }, [year])
 
   useEffect(() => { loadRecent() }, [loadRecent])
   useRealtime(['inventory_operations', 'inventory_transactions', 'items'], loadRecent)

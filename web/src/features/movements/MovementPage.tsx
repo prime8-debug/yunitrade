@@ -5,6 +5,7 @@ import { ItemsCatalog } from '../../components/ItemsCatalog'
 import { BeginningAdjustmentLog } from './BeginningAdjustmentLog'
 import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
+import { useStockYear, yearFilter } from '../../lib/useStockYear'
 import { isSuggestionPick, matchJobOrders, useSalesOrders } from '../../lib/useSalesOrders'
 import { formatQty, type StockRow } from '../../lib/types'
 import type { MovementConfig } from './configs'
@@ -67,6 +68,7 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
   const [recent, setRecent] = useState<RecentRow[]>([])
+  const year = useStockYear()
   const [recentQuery, setRecentQuery] = useState('')
 
   // Selecting an item defaults Width/Length to its usual size — still editable
@@ -84,14 +86,11 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
   }
 
   const loadRecent = useCallback(async () => {
-    if (config.showCatalog) return
-    const { data } = await supabase
-      .from(config.table)
-      .select('*, item:items(item_code, description, width, width_unit, length, length_unit)')
-      .order('created_at', { ascending: false })
-      .limit(50)
+    if (config.showCatalog || year === undefined) return
+    const query = supabase.from(config.table).select('*, item:items(item_code, description, width, width_unit, length, length_unit)')
+    const { data } = await (year ? query.or(yearFilter(year)) : query).order('created_at', { ascending: false }).limit(50)
     setRecent((data as RecentRow[]) ?? [])
-  }, [config.table, config.showCatalog])
+  }, [config.table, config.showCatalog, year])
 
   useEffect(() => {
     loadRecent()

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
+import { useStockYear } from '../../lib/useStockYear'
 import { formatQty } from '../../lib/types'
 
 interface AdjustmentRow {
@@ -18,14 +19,14 @@ interface AdjustmentRow {
 export function BeginningAdjustmentLog() {
   const [rows, setRows] = useState<AdjustmentRow[]>([])
 
+  const year = useStockYear()
+
   const load = useCallback(async () => {
-    const { data } = await supabase
-      .from('beginning_adjustments')
-      .select('*, item:items(item_code, description), changed_by:profiles(display_name, email)')
-      .order('created_at', { ascending: false })
-      .limit(50)
+    if (year === undefined) return
+    const query = supabase.from('beginning_adjustments').select('*, item:items(item_code, description), changed_by:profiles(display_name, email)')
+    const { data } = await (year ? query.gt('created_at', year.closed_at) : query).order('created_at', { ascending: false }).limit(50)
     setRows((data as AdjustmentRow[]) ?? [])
-  }, [])
+  }, [year])
   useEffect(() => {
     load()
   }, [load])

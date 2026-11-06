@@ -7,4 +7,6 @@ export default defineConfig({
   // Relative asset paths so the build works under GitHub Pages' /yunitrade/ subpath.
   base: './',
   plugins: [react(), tailwindcss()],
+  // The sales order rules live in supabase/functions/_shared so the scheduled job can use them too.
+  server: { fs: { allow: ['..'] } },
 })

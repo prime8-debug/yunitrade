@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
+import { useStockYear } from '../../lib/useStockYear'
 import { formatQty, type StockRow } from '../../lib/types'
 import { ItemHistory } from './ItemHistory'
 
@@ -12,8 +13,13 @@ export function StocksPage() {
   const [hideZero, setHideZero] = useState(false)
   const [selected, setSelected] = useState<StockRow | null>(null)
 
-  // Average per month = Withdrawn ÷ this month's number (Jan = 1 … Nov = 11, Dec = 12).
-  const monthNo = new Date().getMonth() + 1
+  const year = useStockYear()
+  // Average per month = Withdrawn ÷ this month's number (Jan = 1 … Nov = 11, Dec = 12),
+  // or after a year-end clear, ÷ the months since the start date (Dec = 1, Jan = 2 …).
+  const now = new Date()
+  const monthNo = year
+    ? Math.max(1, (now.getFullYear() - Number(year.start_date.slice(0, 4))) * 12 + now.getMonth() + 1 - Number(year.start_date.slice(5, 7)) + 1)
+    : now.getMonth() + 1
 
   const load = useCallback(async () => {
     const { data, error } = await supabase.from('current_stock').select('*').eq('active', true).order('item_code')
@@ -68,7 +74,7 @@ export function StocksPage() {
               <th className="text-right">Beginning</th>
               <th className="text-right">Received</th>
               <th className="text-right">Withdrawn</th>
-              <th className="text-right" title={`Withdrawn ÷ ${monthNo} (this month's number)`}>
+              <th className="text-right" title={`Withdrawn ÷ ${monthNo} (${year ? 'months since the start date' : "this month's number"})`}>
                 Average per Month
               </th>
               <th className="text-right">On Hand</th>

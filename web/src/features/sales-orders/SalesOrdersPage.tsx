@@ -3,15 +3,17 @@ import { errorMessage, supabase } from '../../lib/supabase'
 import { formatQty } from '../../lib/types'
 import { refreshSalesOrders, useSalesOrdersState } from '../../lib/useSalesOrders'
 import { ApplyWithdrawals } from './ApplyWithdrawals'
+import { AutoWithdrawals } from './AutoWithdrawals'
 
 const SETTING_KEY = 'sales_sheet_csv_url'
 const PAGE_SIZE = 200
 
-type SubTab = 'orders' | 'apply'
+type SubTab = 'orders' | 'apply' | 'auto'
 
 const TABS: { id: SubTab; label: string }[] = [
   { id: 'orders', label: 'Sales Orders' },
   { id: 'apply', label: 'Apply Withdrawals' },
+  { id: 'auto', label: 'Automation' },
 ]
 
 /** ADMIN-only, read-only view of the Sales Order Google Sheet (via its "Publish to web" CSV link). */
@@ -102,7 +104,7 @@ export function SalesOrdersPage() {
         ))}
       </div>
 
-      {tab === 'apply' ? <ApplyWithdrawals /> : (
+      {tab === 'apply' ? <ApplyWithdrawals /> : tab === 'auto' ? <AutoWithdrawals /> : (
       <div>
         <div className="flex flex-wrap items-center gap-3 mb-2">
           <input

@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { errorMessage, supabase } from '../../lib/supabase'
 import { formatQty, type StockRow } from '../../lib/types'
 import { refreshSalesOrders, useSalesOrdersState } from '../../lib/useSalesOrders'
-import { buildPlan, parseSize, toLookup, withdrawnKey, type LookupRow, type PlanRow, type YardsRoll } from './salesWithdrawals'
+import { AUTO_START_KEY, LOOKUP_URL_KEY, loadWithdrawn } from '../../../../supabase/functions/_shared/autoWithdrawals.ts'
+import { buildPlan, toLookup, withdrawalParams, withdrawnKey, type LookupRow, type PlanRow, type YardsRoll } from './salesWithdrawals'
 
-const LOOKUP_KEY = 'item_lookup_csv_url'
 const REMARK = 'From Sales Orders'
 
 const today = () => new Date().toLocaleDateString('en-CA')
@@ -14,41 +14,10 @@ const STATE_STYLE: Record<PlanRow['state'], string> = {
   input: 'text-amber-700',
   blocked: 'text-red-600',
   done: 'text-slate-400',
+  changed: 'text-red-600',
 }
 
-/** "JOBORDER|item_id" pairs with a live (not voided) withdrawal, from main stock or Yards. */
-async function loadWithdrawn(jobOrders: string[], rolls: YardsRoll[]): Promise<Set<string>> {
-  const done = new Set<string>()
-  if (jobOrders.length === 0) return done
-
-  const { data: main, error } = await supabase
-    .from('withdrawals')
-    .select('withdrawal_no, item_id')
-    .in('withdrawal_no', jobOrders)
-    .is('voided_at', null)
-  if (error) throw new Error(errorMessage(error))
-  for (const w of main ?? []) done.add(withdrawnKey(w.withdrawal_no, w.item_id))
-
-  const { data: yards, error: yardsError } = await supabase
-    .from('yards_transactions')
-    .select('id, roll_id, withdrawal_no')
-    .in('withdrawal_no', jobOrders)
-    .eq('transaction_type', 'WITHDRAWAL')
-  if (yardsError) throw new Error(errorMessage(yardsError))
-  const { data: reversals } = await supabase
-    .from('yards_transactions')
-    .select('reversal_of')
-    .in('reversal_of', (yards ?? []).map((y) => y.id))
-  const reversed = new Set((reversals ?? []).map((r) => r.reversal_of))
-  const rollItem = new Map(rolls.map((r) => [r.roll_id, r.item_id]))
-  for (const y of yards ?? []) {
-    const itemId = rollItem.get(y.roll_id)
-    if (itemId && !reversed.has(y.id)) done.add(withdrawnKey(y.withdrawal_no, itemId))
-  }
-  return done
-}
-
-/** Turns one date's sales orders into withdrawals, after a review. ADMIN-only (inside Sales Orders). */
+/** Turns a date range of sales orders into withdrawals, after a review. ADMIN-only (inside Sales Orders). */
 export function ApplyWithdrawals() {
   const { orders, loading: sheetLoading, error: sheetError } = useSalesOrdersState()
   const [url, setUrl] = useState<string | null | undefined>(undefined)
@@ -58,8 +27,10 @@ export function ApplyWithdrawals() {
   const [lookup, setLookup] = useState<LookupRow[]>([])
   const [items, setItems] = useState<StockRow[]>([])
   const [rolls, setRolls] = useState<YardsRoll[]>([])
-  const [withdrawn, setWithdrawn] = useState<Set<string>>(new Set())
-  const [date, setDate] = useState(today)
+  const [withdrawn, setWithdrawn] = useState<Map<string, number>>(new Map())
+  const [hideDone, setHideDone] = useState(true)
+  const [from, setFrom] = useState(today)
+  const [to, setTo] = useState(today)
   const [itemChoice, setItemChoice] = useState<Record<string, string>>({})
   const [coreChoice, setCoreChoice] = useState<Record<string, string>>({})
   const [excluded, setExcluded] = useState<Set<string>>(new Set())
@@ -78,16 +49,21 @@ export function ApplyWithdrawals() {
   useEffect(() => {
     supabase
       .from('app_settings')
-      .select('value')
-      .eq('key', LOOKUP_KEY)
-      .maybeSingle()
+      .select('key, value')
+      .in('key', [LOOKUP_URL_KEY, AUTO_START_KEY])
       .then(({ data, error }) => {
         if (error) setError(errorMessage(error))
-        setUrl(data?.value || null)
+        setUrl(data?.find((s) => s.key === LOOKUP_URL_KEY)?.value || null)
+        // With automation set up, what's left to review is everything since it started.
+        const start = data?.find((s) => s.key === AUTO_START_KEY)?.value
+        if (start && start < today()) setFrom(start)
       })
   }, [])
 
-  const dayJobOrders = useMemo(() => [...new Set(orders.filter((o) => o.date === date).map((o) => o.jobOrder))], [orders, date])
+  const rangeJobOrders = useMemo(
+    () => [...new Set(orders.filter((o) => o.date >= from && o.date <= to).map((o) => o.jobOrder))],
+    [orders, from, to],
+  )
 
   const load = useCallback(async () => {
     if (!url) return
@@ -102,7 +78,7 @@ export function ApplyWithdrawals() {
       ])
       if (stockError || rollError) throw new Error(errorMessage(stockError ?? rollError))
       const nextRolls = (rollData as YardsRoll[]) ?? []
-      const nextWithdrawn = await loadWithdrawn(dayJobOrders, nextRolls)
+      const nextWithdrawn = await loadWithdrawn(supabase, rangeJobOrders, nextRolls)
       setLookup(nextLookup)
       setItems((stock as StockRow[]) ?? [])
       setRolls(nextRolls)
@@ -113,20 +89,22 @@ export function ApplyWithdrawals() {
     } finally {
       setLoading(false)
     }
-  }, [url, dayJobOrders])
+  }, [url, rangeJobOrders])
   useEffect(() => {
     load()
   }, [load])
 
   const plan = useMemo(
-    () => buildPlan({ orders, lookup, date, items, rolls, withdrawn, itemChoice, coreChoice, excluded }),
-    [orders, lookup, date, items, rolls, withdrawn, itemChoice, coreChoice, excluded],
+    () => buildPlan({ orders, lookup, from, to, items, rolls, withdrawn, itemChoice, coreChoice, excluded }),
+    [orders, lookup, from, to, items, rolls, withdrawn, itemChoice, coreChoice, excluded],
   )
   const toPost = plan.filter((p) => p.state === 'ready' && !excluded.has(p.order.key))
   const count = (state: PlanRow['state']) => plan.filter((p) => p.state === state).length
+  const shown = hideDone ? plan.filter((p) => p.state !== 'done') : plan
 
-  function changeDate(value: string) {
-    setDate(value)
+  function changeRange(nextFrom: string, nextTo: string) {
+    setFrom(nextFrom)
+    setTo(nextTo)
     setItemChoice({})
     setCoreChoice({})
     setExcluded(new Set())
@@ -148,7 +126,7 @@ export function ApplyWithdrawals() {
     if (!/^https:\/\/docs\.google\.com\/spreadsheets\/.+output=csv/.test(value)) {
       return setError('Paste the link from File → Share → Publish to web, with the format set to CSV (it ends in output=csv).')
     }
-    const { error } = await supabase.from('app_settings').upsert({ key: LOOKUP_KEY, value, updated_at: new Date().toISOString() })
+    const { error } = await supabase.from('app_settings').upsert({ key: LOOKUP_URL_KEY, value, updated_at: new Date().toISOString() })
     if (error) return setError(errorMessage(error))
     setError(null)
     setEditingUrl(false)
@@ -156,34 +134,23 @@ export function ApplyWithdrawals() {
   }
 
   async function postOne(p: PlanRow) {
-    const { order: o, item, roll, quantity } = p
+    const { order: o, roll, quantity } = p
     if (roll) {
       return supabase.rpc('withdraw_yards', {
         p_roll_id: roll.roll_id,
         p_quantity: quantity,
-        p_entry_date: date,
+        p_entry_date: o.date,
         p_customer: o.customer || null,
         p_remarks: REMARK,
         p_withdrawal_no: o.jobOrder,
       })
     }
-    return supabase.rpc('post_withdrawal', {
-      p_item_id: item!.item_id,
-      p_quantity: quantity,
-      p_entry_date: date,
-      p_withdrawal_no: o.jobOrder,
-      p_customer: o.customer || null,
-      p_remarks: REMARK,
-      p_width: parseSize(o.width) ?? item!.width,
-      p_width_unit: o.widthUnit || item!.width_unit,
-      p_length: parseSize(o.length) ?? item!.length,
-      p_length_unit: o.lengthUnit || item!.length_unit,
-      p_description: o.itemDescription || item!.description,
-    })
+    return supabase.rpc('post_sales_order_withdrawal', withdrawalParams(p, REMARK))
   }
 
   async function post() {
-    if (!window.confirm(`Post ${toPost.length} withdrawal${toPost.length === 1 ? '' : 's'} dated ${date}? This reduces stock.`)) return
+    const dated = from === to ? `dated ${from}` : `using each order's own date (${from} to ${to})`
+    if (!window.confirm(`Post ${toPost.length} withdrawal${toPost.length === 1 ? '' : 's'} ${dated}? This reduces stock.`)) return
     setPosting(true)
     setMessage(null)
     const errors: Record<string, string> = {}
@@ -191,7 +158,7 @@ export function ApplyWithdrawals() {
     let skipped = 0
     try {
       // Re-check right before posting, in case someone withdrew one of these in the meantime.
-      const latest = await loadWithdrawn(dayJobOrders, rolls)
+      const latest = await loadWithdrawn(supabase, rangeJobOrders, rolls)
       for (const p of toPost) {
         const itemId = p.roll?.item_id ?? p.item!.item_id
         if (latest.has(withdrawnKey(p.order.jobOrder, itemId))) {
@@ -245,8 +212,12 @@ export function ApplyWithdrawals() {
     <div>
       <div className="flex flex-wrap items-end gap-4 mb-3">
         <label>
-          <span className="label">Date</span>
-          <input className="input w-44" type="date" value={date} onChange={(e) => changeDate(e.target.value)} />
+          <span className="label">From</span>
+          <input className="input w-44" type="date" value={from} onChange={(e) => changeRange(e.target.value, to)} />
+        </label>
+        <label>
+          <span className="label">To</span>
+          <input className="input w-44" type="date" value={to} onChange={(e) => changeRange(from, e.target.value)} />
         </label>
         <button className="btn-primary" onClick={post} disabled={posting || busy || toPost.length === 0}>
           {posting ? 'Posting…' : `Post ${toPost.length} Withdrawal${toPost.length === 1 ? '' : 's'}`}
@@ -254,8 +225,12 @@ export function ApplyWithdrawals() {
         <span className="text-xs text-slate-400 pb-2">
           {busy
             ? 'Loading the latest sheets…'
-            : `${count('ready')} ready · ${count('input')} need input · ${count('blocked')} can't post · ${count('done')} already withdrawn`}
+            : `${count('ready')} ready · ${count('input')} need input · ${count('blocked')} can't post · ${count('changed')} changed in the sheet · ${count('done')} already withdrawn`}
         </span>
+        <label className="flex items-center gap-1 text-xs text-slate-500 pb-2">
+          <input type="checkbox" checked={hideDone} onChange={(e) => setHideDone(e.target.checked)} />
+          Hide already withdrawn
+        </label>
         <button
           className="text-xs text-blue-600 underline ml-auto pb-2"
           onClick={() => {
@@ -275,6 +250,7 @@ export function ApplyWithdrawals() {
           <thead>
             <tr>
               <th />
+              <th>Date</th>
               <th>Job Order</th>
               <th>Customer</th>
               <th>Sales Order Item</th>
@@ -287,7 +263,7 @@ export function ApplyWithdrawals() {
             </tr>
           </thead>
           <tbody>
-            {plan.map((p) => {
+            {shown.map((p) => {
               const { order: o } = p
               const rowError = rowErrors[o.key]
               return (
@@ -302,6 +278,7 @@ export function ApplyWithdrawals() {
                       />
                     )}
                   </td>
+                  <td className="whitespace-nowrap">{o.date}</td>
                   <td className="font-mono font-semibold whitespace-nowrap">{o.jobOrder}</td>
                   <td>{o.customer}</td>
                   <td>
@@ -315,7 +292,7 @@ export function ApplyWithdrawals() {
                   <td>{o.unit}</td>
                   <td>{o.status}</td>
                   <td className="whitespace-nowrap">
-                    {p.state !== 'done' && p.target === 'yards' && (
+                    {p.state !== 'done' && p.state !== 'changed' && p.target === 'yards' && (
                       <div className="flex items-center gap-2">
                         <input
                           className="input w-24"
@@ -327,7 +304,7 @@ export function ApplyWithdrawals() {
                         <span className="text-xs text-slate-500">{p.roll?.item_code ?? p.candidates.join(' / ')}</span>
                       </div>
                     )}
-                    {p.state !== 'done' && p.target === 'stock' && p.candidates.length > 1 && (
+                    {p.state !== 'done' && p.state !== 'changed' && p.target === 'stock' && p.candidates.length > 1 && (
                       <select
                         className="input"
                         aria-label={`Item for ${o.jobOrder}`}
@@ -346,10 +323,10 @@ export function ApplyWithdrawals() {
                 </tr>
               )
             })}
-            {plan.length === 0 && (
+            {shown.length === 0 && (
               <tr>
-                <td colSpan={10} className="text-center text-slate-400 py-6">
-                  {busy ? 'Loading…' : 'No lookup items in the sales orders for this date.'}
+                <td colSpan={11} className="text-center text-slate-400 py-6">
+                  {busy ? 'Loading…' : from > to ? 'The To date is before the From date.' : plan.length ? 'Everything for these dates is already withdrawn.' : 'No lookup items in the sales orders for these dates.'}
                 </td>
               </tr>
             )}
