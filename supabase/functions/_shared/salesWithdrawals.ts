@@ -132,10 +132,12 @@ export function matchOrder(order: OrderRow, lookup: LookupRow[]): Match | null {
   const length = parseSize(order.length)
   const unit = upper(order.unit ?? '')
 
-  // Part of a roll: comes out of Yards Stock, so only the width says which item it is.
+  // Part of a roll: comes out of Yards Stock. The Core No. picks the exact roll, so a width
+  // that isn't on the lookup falls back to any of this item's codes instead of stopping here.
   if (unit === 'YDS') {
-    const candidates = codes(width === null ? rows : rows.filter((l) => l.width === width))
-    return candidates.length ? { kind: 'yards', candidates, quantity } : manual(`No ${order.width} width for this item on the lookup`)
+    const sameWidth = codes(width === null ? rows : rows.filter((l) => l.width === width))
+    const candidates = sameWidth.length ? sameWidth : codes(rows)
+    return candidates.length ? { kind: 'yards', candidates, quantity } : manual('Lookup row has no ITEMCODE IN FRONTEND')
   }
   if (!unit) return manual('Sales order has no unit')
   if (unit === 'M') return manual('Unit M — enter by hand')
