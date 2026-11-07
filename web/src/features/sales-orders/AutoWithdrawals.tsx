@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { errorMessage, supabase } from '../../lib/supabase'
 import { formatQty } from '../../lib/types'
 import { useRealtime } from '../../lib/useRealtime'
-import { AUTO_ENABLED_KEY, AUTO_REMARK, AUTO_START_KEY } from '../../../../supabase/functions/_shared/autoWithdrawals.ts'
+import { yearFilter } from '../../lib/useStockYear'
+import { AUTO_ENABLED_KEY, AUTO_REMARK, AUTO_START_KEY, type RunDetail } from '../../../../supabase/functions/_shared/autoWithdrawals.ts'
 
 const STALE_MINUTES = 15
 
@@ -14,6 +15,7 @@ interface Run {
   held: number
   failed: number
   message: string | null
+  details: RunDetail[] | null
 }
 
 interface AutoPost {
@@ -28,6 +30,7 @@ interface AutoPost {
 interface YearRow {
   start_date: string
   items_closed: number
+  rolls_closed: number
   closed_at: string
 }
 
@@ -38,6 +41,7 @@ export function AutoWithdrawals() {
   const [enabled, setEnabled] = useState(false)
   const [year, setYear] = useState<YearRow | null>(null)
   const [runs, setRuns] = useState<Run[]>([])
+  const [openDetail, setOpenDetail] = useState<{ runId: number; kind: RunDetail['kind'] } | null>(null)
   const [posts, setPosts] = useState<AutoPost[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -45,20 +49,23 @@ export function AutoWithdrawals() {
   const [message, setMessage] = useState<string | null>(null)
 
   const loadActivity = useCallback(async () => {
-    const [yearRes, runRes, postRes] = await Promise.all([
-      supabase.from('stock_years').select('start_date, items_closed, closed_at').order('start_date', { ascending: false }).limit(1).maybeSingle(),
+    const yearRes = await supabase.from('stock_years').select('start_date, items_closed, rolls_closed, closed_at').order('start_date', { ascending: false }).limit(1).maybeSingle()
+    if (yearRes.error) return setError(errorMessage(yearRes.error))
+    const currentYear = yearRes.data as YearRow | null
+
+    // Records from before a year-end clear are already out of stock, so only this year's are listed.
+    const postQuery = supabase
+      .from('withdrawals')
+      .select('id, entry_date, quantity, withdrawal_no, customer, item:items(item_code)')
+      .eq('remarks', AUTO_REMARK)
+      .is('voided_at', null)
+    const [runRes, postRes] = await Promise.all([
       supabase.from('auto_withdrawal_runs').select('*').order('ran_at', { ascending: false }).limit(10),
-      supabase
-        .from('withdrawals')
-        .select('id, entry_date, quantity, withdrawal_no, customer, item:items(item_code)')
-        .eq('remarks', AUTO_REMARK)
-        .is('voided_at', null)
-        .order('created_at', { ascending: false })
-        .limit(30),
+      (currentYear ? postQuery.or(yearFilter(currentYear)) : postQuery).order('created_at', { ascending: false }).limit(30),
     ])
-    const failed = yearRes.error ?? runRes.error ?? postRes.error
+    const failed = runRes.error ?? postRes.error
     if (failed) return setError(errorMessage(failed))
-    setYear(yearRes.data as YearRow | null)
+    setYear(currentYear)
     setRuns((runRes.data as Run[]) ?? [])
     setPosts((postRes.data as unknown as AutoPost[]) ?? [])
   }, [])
@@ -98,7 +105,7 @@ export function AutoWithdrawals() {
     if (!clearDate) return setError('Choose the new beginning date first.')
     const typed = window.prompt(
       `Clear the year and start from ${clearDate}?\n\nEverything dated before ${clearDate} is hidden and stock for those records goes to 0, ` +
-        `so enter the new Beginning count right after. Old records are kept. Yards and Partial stock are not changed. ` +
+        `so enter the new Beginning count right after. Yards and Partial rolls stay with their numbers, but their data before that date is cleared. Old records are kept. ` +
         `The automation start date also moves to ${clearDate}.\n\nType ${clearDate} to confirm:`,
     )
     if (typed === null) return
@@ -110,7 +117,7 @@ export function AutoWithdrawals() {
     if (error) return setError(errorMessage(error))
     setError(null)
     setClearDate('')
-    setMessage(`Cleared ${data} items. Now enter the new Beginning stock.`)
+    setMessage(`Cleared ${data} items and their rolls. Now enter the new Beginning stock, and use Edit on each Yards and Partial roll to enter its count.`)
     loadSettings()
     loadActivity()
   }
@@ -148,6 +155,24 @@ export function AutoWithdrawals() {
 
   if (loading) return <p className="text-slate-500">Loading…</p>
 
+  const openRun = openDetail && runs.find((r) => r.id === openDetail.runId)
+  const openRows = openRun?.details?.filter((d) => d.kind === openDetail?.kind) ?? []
+
+  /** A run's count, as a button that shows or hides the orders behind it. */
+  function detailCount(r: Run, kind: RunDetail['kind'], count: number) {
+    if (count === 0) return count
+    const isOpen = openDetail?.runId === r.id && openDetail.kind === kind
+    return (
+      <button
+        className={`underline ${isOpen ? 'font-semibold text-blue-700' : 'text-blue-600'}`}
+        aria-expanded={isOpen}
+        onClick={() => setOpenDetail(isOpen ? null : { runId: r.id, kind })}
+      >
+        {count}
+      </button>
+    )
+  }
+
   const lastRun = runs[0]
   const stale = !lastRun || Date.now() - new Date(lastRun.ran_at).getTime() > STALE_MINUTES * 60_000
 
@@ -183,8 +208,9 @@ export function AutoWithdrawals() {
         <h2 className="font-semibold">Year-end clear</h2>
         <p className="text-sm text-slate-600">
           Choose the date of the new beginning stock whenever management sets it. Records dated before it are hidden and kept, Stocks counts
-          from that date, and the automation start date moves to it. Do this after the count, then enter the new Beginning stock. It can be
-          done from the day before that date.
+          from that date, and the automation start date moves to it. Yards and Partial rolls keep their numbers, but their data before it is
+          cleared. Do this after the count, then enter the new Beginning stock and use Edit on each roll to enter its count. It can be done
+          from the day before that date.
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <label>
@@ -197,7 +223,7 @@ export function AutoWithdrawals() {
           {year && (
             <>
               <span className="text-sm text-slate-500">
-                Current year started {year.start_date} ({year.items_closed} items cleared)
+                Current year started {year.start_date} ({year.items_closed} items and {year.rolls_closed} rolls cleared)
               </span>
               <button className="text-xs text-blue-600 underline" disabled={busy} onClick={undoYear}>
                 Undo
@@ -230,8 +256,8 @@ export function AutoWithdrawals() {
                   <td className="whitespace-nowrap">{new Date(r.ran_at).toLocaleString()}</td>
                   <td className={r.status === 'error' ? 'text-red-600' : ''}>{r.status}</td>
                   <td className="text-right">{r.posted}</td>
-                  <td className="text-right">{r.held}</td>
-                  <td className="text-right">{r.failed}</td>
+                  <td className="text-right">{detailCount(r, 'review', r.held)}</td>
+                  <td className="text-right">{detailCount(r, 'failed', r.failed)}</td>
                   <td className="text-sm">{r.message}</td>
                 </tr>
               ))}
@@ -245,6 +271,54 @@ export function AutoWithdrawals() {
             </tbody>
           </table>
         </div>
+
+        {openRun && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-sm">
+                {openDetail?.kind === 'failed' ? 'Failed' : 'Needs review'} · {new Date(openRun.ran_at).toLocaleString()}
+              </h3>
+              <button className="text-xs text-blue-600 underline" onClick={() => setOpenDetail(null)}>
+                Close
+              </button>
+            </div>
+            <div className="card overflow-x-auto">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Job Order</th>
+                    <th>Customer</th>
+                    <th>Sales Order Item</th>
+                    <th className="text-right">Quantity</th>
+                    <th>Unit</th>
+                    <th>Reason</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {openRows.map((d, i) => (
+                    <tr key={`${d.job_order}-${i}`}>
+                      <td className="whitespace-nowrap">{d.date}</td>
+                      <td className="font-mono font-semibold whitespace-nowrap">{d.job_order}</td>
+                      <td>{d.customer}</td>
+                      <td className="font-mono whitespace-nowrap">{d.item}</td>
+                      <td className="text-right">{formatQty(d.quantity)}</td>
+                      <td>{d.unit}</td>
+                      <td className="text-sm text-red-600">{d.note}</td>
+                    </tr>
+                  ))}
+                  {openRows.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="text-center text-slate-400 py-6">
+                        Details for this run aren't available. They're kept for one day.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </section>
 
       <section>

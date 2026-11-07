@@ -59,7 +59,9 @@ Management sets the date each year. Nothing in the app assumes a particular date
 2. In **Automation → Year-end clear**, choose the **New beginning date**.
 3. Press **Clear and start new year**. It opens from the day before that date. The automation start
    date moves to the same date, and automation stays on or off as it was.
-4. Enter the new Beginning stock in the **Beginning** tab.
+4. Enter the new Beginning stock in the **Beginning** tab. Yards and Partial rolls keep their numbers
+   with 0 left, so use **Edit** on each roll to enter its count (Yards Stock → Add / Edit Roll and
+   Partial Rolls → Add / Edit Partial Roll).
 5. If automation is off, press **Turn on**.
 
 Orders short of stock wait and post once Beginning is entered, so step 5 can come before step 4 ends.

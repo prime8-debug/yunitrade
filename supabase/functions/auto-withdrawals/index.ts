@@ -3,6 +3,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 import { runAutoWithdrawals, type RunResult } from '../_shared/autoWithdrawals.ts'
 
 const RUNS_KEPT_DAYS = 30
+const DETAILS_KEPT_DAYS = 1
 
 async function fetchText(url: string) {
   const res = await fetch(url)
@@ -25,7 +26,9 @@ Deno.serve(async (req) => {
   }
 
   await db.from('auto_withdrawal_runs').insert(result)
-  await db.from('auto_withdrawal_runs').delete().lt('ran_at', new Date(Date.now() - RUNS_KEPT_DAYS * 86_400_000).toISOString())
+  const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString()
+  await db.from('auto_withdrawal_runs').delete().lt('ran_at', daysAgo(RUNS_KEPT_DAYS))
+  await db.from('auto_withdrawal_runs').update({ details: null }).lt('ran_at', daysAgo(DETAILS_KEPT_DAYS)).not('details', 'is', null)
 
   return Response.json(result)
 })

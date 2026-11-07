@@ -1,5 +1,5 @@
 import { toOrders } from './salesSheet.ts'
-import { buildPlan, toLookup, withdrawalParams, withdrawnKey, type PlanItem, type YardsRoll } from './salesWithdrawals.ts'
+import { buildPlan, toLookup, withdrawalParams, withdrawnKey, type PlanItem, type PlanRow, type YardsRoll } from './salesWithdrawals.ts'
 
 export const AUTO_REMARK = 'Auto from Sales Orders'
 export const SALES_URL_KEY = 'sales_sheet_csv_url'
@@ -20,12 +20,30 @@ export interface Db {
   rpc(fn: string, args?: Record<string, unknown>): any
 }
 
+/** One order a run held for review or couldn't post. */
+export interface RunDetail {
+  kind: 'review' | 'failed'
+  date: string
+  job_order: string
+  customer: string
+  item: string
+  quantity: number
+  unit: string
+  note: string
+}
+
 export interface RunResult {
   status: 'off' | 'waiting' | 'ok' | 'error'
   posted: number
   held: number
   failed: number
   message: string | null
+  details?: RunDetail[]
+}
+
+function runDetail(kind: RunDetail['kind'], p: PlanRow, note: string): RunDetail {
+  const { order: o, quantity } = p
+  return { kind, date: o.date, job_order: o.jobOrder, customer: o.customer, item: o.itemId, quantity, unit: o.unit, note }
 }
 
 async function loadWithdrawnBatch(db: Db, jobOrders: string[], rolls: YardsRoll[], done: Map<string, number>) {
@@ -113,7 +131,9 @@ export async function runAutoWithdrawals(db: Db, fetchText: (url: string) => Pro
   const plan = buildPlan({ orders, lookup, from: start, to: today, items, rolls, withdrawn, itemChoice: {}, coreChoice: {}, excluded: new Set() })
 
   const ready = plan.filter((p) => p.state === 'ready')
-  result.held = plan.filter((p) => p.state === 'input' || p.state === 'blocked' || p.state === 'changed').length
+  const held = plan.filter((p) => p.state === 'input' || p.state === 'blocked' || p.state === 'changed')
+  result.held = held.length
+  result.details = held.map((p) => runDetail('review', p, p.note))
   if (ready.length > MAX_POSTS_PER_RUN) {
     throw new Error(`${ready.length} orders are ready at once, so nothing was posted. Check the start date and the sheet.`)
   }
@@ -126,6 +146,7 @@ export async function runAutoWithdrawals(db: Db, fetchText: (url: string) => Pro
     } else if (!error.message.startsWith('Already withdrawn')) {
       result.failed++
       failures.push(`${p.order.jobOrder}: ${error.message}`)
+      result.details.push(runDetail('failed', p, error.message))
     }
   }
   if (failures.length) result.message = failures.slice(0, 5).join(' · ')
