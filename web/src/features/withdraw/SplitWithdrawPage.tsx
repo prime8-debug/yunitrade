@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useAuth } from '../../auth/AuthProvider'
 import { ItemPicker } from '../../components/ItemPicker'
 import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
+import { isSuggestionPick, matchJobOrders, useSalesOrders } from '../../lib/useSalesOrders'
 import { useStockYear, yearFilter } from '../../lib/useStockYear'
 import { formatQty, formatSize, type StockRow } from '../../lib/types'
 
@@ -63,6 +64,18 @@ export function SplitWithdrawPage() {
   const [withdrawalNo, setWithdrawalNo] = useState('')
   const [operationNo, setOperationNo] = useState('')
   const [remarks, setRemarks] = useState('')
+  const remarksRef = useRef<HTMLInputElement>(null)
+  // Withdrawal No. suggests Job Orders from the Sales Orders sheet; picking one fills Customer (same as Roll / PC).
+  const salesOrders = useSalesOrders()
+  const jobOrderSuggestions = useMemo(() => matchJobOrders(salesOrders, withdrawalNo), [salesOrders, withdrawalNo])
+
+  function changeWithdrawalNo(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value
+    setWithdrawalNo(value)
+    const match = jobOrderSuggestions.find((o) => o.jobOrder.toLowerCase() === value.trim().toLowerCase())
+    if (match?.customer) setCustomer(match.customer)
+    if (match && isSuggestionPick(e)) setTimeout(() => remarksRef.current?.focus(), 0)
+  }
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
   const [recent, setRecent] = useState<OperationRow[]>([])
@@ -239,9 +252,29 @@ export function SplitWithdrawPage() {
           <label><span className="label">Source rolls to use {yieldPerSource && <span className="text-slate-400 font-normal">(auto from customer rolls)</span>}</span><input className={`input ${overSourceStock ? 'border-red-500' : ''}`} type="number" min="1" step="1" value={sourceQty} onChange={e => setSourceQty(e.target.value)} />{overSourceStock && <span className="text-xs text-red-600">More than source stock.</span>}</label>
           <label><span className="label">Date</span><input className="input" type="date" required value={date} onChange={e => setDate(e.target.value)} /></label>
           <label><span className="label">Operation No. <span className="text-slate-400">(optional)</span></span><input className="input" placeholder="Auto-generate" value={operationNo} onChange={e => setOperationNo(e.target.value)} /></label>
-          <label><span className="label">Withdrawal No.</span><input className="input" value={withdrawalNo} onChange={e => setWithdrawalNo(e.target.value)} /></label>
+          <label>
+            <span className="label">Withdrawal No.</span>
+            <input
+              className="input"
+              list="split-job-order-suggestions"
+              autoComplete="off"
+              value={withdrawalNo}
+              onChange={changeWithdrawalNo}
+              onKeyDown={(e) => {
+                // Enter moves on to Remarks instead of submitting the split.
+                if (e.key !== 'Enter') return
+                e.preventDefault()
+                remarksRef.current?.focus()
+              }}
+            />
+            <datalist id="split-job-order-suggestions">
+              {jobOrderSuggestions.map((o) => (
+                <option key={o.jobOrder} value={o.jobOrder} label={[o.customer, o.itemId, o.quantity].filter(Boolean).join(' · ')} />
+              ))}
+            </datalist>
+          </label>
           <label><span className="label">Customer</span><input className="input" value={customer} onChange={e => setCustomer(e.target.value)} /></label>
-          <label className="md:col-span-2"><span className="label">Remarks</span><input className="input" value={remarks} onChange={e => setRemarks(e.target.value)} /></label>
+          <label className="md:col-span-2"><span className="label">Remarks</span><input ref={remarksRef} className="input" value={remarks} onChange={e => setRemarks(e.target.value)} /></label>
         </div>
 
         {source && output && yieldPerSource != null && sourceCount > 0 && customerCount > 0 && (
