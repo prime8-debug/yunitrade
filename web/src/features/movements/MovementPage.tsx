@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { useAuth } from '../../auth/AuthProvider'
 import { ItemPicker } from '../../components/ItemPicker'
 import { ItemsCatalog } from '../../components/ItemsCatalog'
-import { BeginningAdjustmentLog } from './BeginningAdjustmentLog'
 import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
 import { inYear, useStockYear, yearFilter, type StockYear } from '../../lib/useStockYear'
@@ -422,11 +421,10 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
             <h2 className="font-semibold text-slate-700 mb-2">Items</h2>
             <p className="text-xs text-slate-400 mb-2">
               Type a Beginning quantity directly in the table — press Enter or click away to save. Changing an already-set balance
-              requires a reason and is logged below.
+              requires a reason.
             </p>
             <ItemsCatalog editableBeginning={config.table === 'beginning_inventory'} />
           </div>
-          <BeginningAdjustmentLog />
         </div>
       ) : (
         <div>
