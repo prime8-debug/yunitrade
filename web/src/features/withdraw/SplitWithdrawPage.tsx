@@ -62,7 +62,6 @@ export function SplitWithdrawPage() {
   const [date, setDate] = useState(today)
   const [customer, setCustomer] = useState('')
   const [withdrawalNo, setWithdrawalNo] = useState('')
-  const [operationNo, setOperationNo] = useState('')
   const [remarks, setRemarks] = useState('')
   const remarksRef = useRef<HTMLInputElement>(null)
   // Withdrawal No. suggests Job Orders from the Sales Orders sheet; picking one fills Customer (same as Roll / PC).
@@ -157,7 +156,6 @@ export function SplitWithdrawPage() {
     setDate(today())
     setCustomer('')
     setWithdrawalNo('')
-    setOperationNo('')
     setRemarks('')
     setMessage(null)
   }
@@ -183,7 +181,7 @@ export function SplitWithdrawPage() {
       p_customer: customer.trim() || null,
       p_withdrawal_no: withdrawalNo.trim() || null,
       p_remarks: remarks.trim() || null,
-      p_operation_no: operationNo.trim() || null,
+      p_operation_no: null, // always auto-generated (SPL-YYYYMMDD-####)
     })
     setBusy(false)
     if (error) return setMessage({ kind: 'error', text: errorMessage(error) })
@@ -196,7 +194,6 @@ export function SplitWithdrawPage() {
     setDate(today())
     setCustomer('')
     setWithdrawalNo('')
-    setOperationNo('')
     setRemarks('')
     setMessage({ kind: 'ok', text: successText })
     await loadRecent()
@@ -218,7 +215,8 @@ export function SplitWithdrawPage() {
       </div>
 
       <form onSubmit={submit} className="card p-5 space-y-5">
-        <div className="grid gap-4 lg:grid-cols-2">
+        {/* Row 1: Source, Output, and the size check. Row 2: the six entry boxes, two under each. */}
+        <div className="grid gap-4 lg:grid-cols-3">
           <div>
             <span className="label">Source stock</span>
             <ItemPicker value={source} onChange={setSource} unitLabel="roll" />
@@ -236,22 +234,27 @@ export function SplitWithdrawPage() {
               unitLabel="roll"
             />
           </div>
+          <div>
+            <span className="label">Split check</span>
+            <div className="rounded border border-slate-200 bg-slate-50 px-3 py-1.5 grid grid-cols-4 gap-2 min-h-[2.4rem]">
+              {source && output ? (
+                <>
+                  <div><div className="text-[11px] text-slate-500">Source</div><div className="font-semibold text-sm">{formatSize(source)}</div></div>
+                  <div><div className="text-[11px] text-slate-500">Output</div><div className="font-semibold text-sm">{formatSize(output)}</div></div>
+                  <div><div className="text-[11px] text-slate-500">Pieces per source roll</div><div className="font-semibold text-sm">{yieldPerSource ?? 'Cannot calculate'}</div></div>
+                  <div><div className="text-[11px] text-slate-500">Source on hand</div><div className="font-semibold text-sm">{formatQty(source.on_hand)} roll</div></div>
+                </>
+              ) : (
+                <div className="col-span-4 self-center text-sm text-slate-400">Pick the source and output to see the split.</div>
+              )}
+            </div>
+          </div>
         </div>
 
-        {source && output && (
-          <div className="rounded-lg bg-slate-50 border border-slate-200 p-4 grid gap-4 md:grid-cols-4">
-            <div><div className="text-xs text-slate-500">Source</div><div className="font-semibold">{formatSize(source)}</div></div>
-            <div><div className="text-xs text-slate-500">Output</div><div className="font-semibold">{formatSize(output)}</div></div>
-            <div><div className="text-xs text-slate-500">Pieces per source roll</div><div className="font-semibold">{yieldPerSource ?? 'Cannot calculate'}</div></div>
-            <div><div className="text-xs text-slate-500">Source on hand</div><div className="font-semibold">{formatQty(source.on_hand)} roll</div></div>
-          </div>
-        )}
-
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
           <label><span className="label">Customer rolls needed</span><input className={`input ${invalidCustomerQty ? 'border-red-500' : ''}`} type="number" min="1" step="1" value={customerQty} onChange={e => setCustomerQty(e.target.value)} /></label>
-          <label><span className="label">Source rolls to use {yieldPerSource && <span className="text-slate-400 font-normal">(auto from customer rolls)</span>}</span><input className={`input ${overSourceStock ? 'border-red-500' : ''}`} type="number" min="1" step="1" value={sourceQty} onChange={e => setSourceQty(e.target.value)} />{overSourceStock && <span className="text-xs text-red-600">More than source stock.</span>}</label>
+          <label><span className="label">Source rolls to use</span><input className={`input ${overSourceStock ? 'border-red-500' : ''}`} type="number" min="1" step="1" value={sourceQty} onChange={e => setSourceQty(e.target.value)} />{overSourceStock && <span className="text-xs text-red-600">More than source stock.</span>}</label>
           <label><span className="label">Date</span><input className="input" type="date" required value={date} onChange={e => setDate(e.target.value)} /></label>
-          <label><span className="label">Operation No. <span className="text-slate-400">(optional)</span></span><input className="input" placeholder="Auto-generate" value={operationNo} onChange={e => setOperationNo(e.target.value)} /></label>
           <label>
             <span className="label">Withdrawal No.</span>
             <input
@@ -274,7 +277,7 @@ export function SplitWithdrawPage() {
             </datalist>
           </label>
           <label><span className="label">Customer</span><input className="input" value={customer} onChange={e => setCustomer(e.target.value)} /></label>
-          <label className="md:col-span-2"><span className="label">Remarks</span><input ref={remarksRef} className="input" value={remarks} onChange={e => setRemarks(e.target.value)} /></label>
+          <label><span className="label">Remarks</span><input ref={remarksRef} className="input" value={remarks} onChange={e => setRemarks(e.target.value)} /></label>
         </div>
 
         {source && output && yieldPerSource != null && sourceCount > 0 && customerCount > 0 && (
