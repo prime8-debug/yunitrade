@@ -5,7 +5,7 @@ import { ItemsCatalog } from '../../components/ItemsCatalog'
 import { BeginningAdjustmentLog } from './BeginningAdjustmentLog'
 import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
-import { useStockYear, yearFilter } from '../../lib/useStockYear'
+import { inYear, useStockYear, yearFilter, type StockYear } from '../../lib/useStockYear'
 import { isSuggestionPick, matchJobOrders, useSalesOrders } from '../../lib/useSalesOrders'
 import { formatQty, type StockRow } from '../../lib/types'
 import type { MovementConfig } from './configs'
@@ -42,6 +42,49 @@ interface RecentRow {
   [field: string]: unknown
 }
 
+interface LedgerEntry {
+  item_id: string
+  quantity: number
+  reference_id: string | null
+  transaction_type: string
+  transaction_date: string
+  created_at: string
+}
+
+/**
+ * Each entry's item balance right after it, from the stock ledger in the same order as the
+ * item history in Stocks (date, then time entered), so a back-dated entry shows the balance
+ * as of its own date. Keyed by the entry's id.
+ */
+async function loadEndingBalances(rows: RecentRow[], year: StockYear | null): Promise<Record<string, number>> {
+  const itemIds = [...new Set(rows.map((r) => r.item_id as string).filter(Boolean))]
+  if (itemIds.length === 0) return {}
+  const ledger: LedgerEntry[] = []
+  const PAGE = 1000 // PostgREST returns at most this many rows per request
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('inventory_transactions')
+      .select('item_id, quantity, reference_id, transaction_type, transaction_date, created_at')
+      .in('item_id', itemIds)
+      .order('transaction_date')
+      .order('created_at')
+      .order('id')
+      .range(from, from + PAGE - 1)
+    if (error) return {}
+    ledger.push(...((data as LedgerEntry[]) ?? []))
+    if (!data || data.length < PAGE) break
+  }
+  const running = new Map<string, number>()
+  const after: Record<string, number> = {}
+  for (const t of ledger) {
+    if (!inYear(year, t.transaction_date, t.created_at)) continue
+    const balance = (running.get(t.item_id) ?? 0) + Number(t.quantity)
+    running.set(t.item_id, balance)
+    if (t.reference_id && t.transaction_type !== 'REVERSAL') after[t.reference_id] = balance
+  }
+  return after
+}
+
 export function MovementPage({ config, hideTitle }: { config: MovementConfig; hideTitle?: boolean }) {
   const { isAdmin } = useAuth()
   const [item, setItem] = useState<StockRow | null>(null)
@@ -69,6 +112,9 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
   const [recent, setRecent] = useState<RecentRow[]>([])
   const year = useStockYear()
   const [recentQuery, setRecentQuery] = useState('')
+  // Withdraw: each recent entry's item balance right after that entry (entry id → balance).
+  const showsBalance = config.table === 'withdrawals'
+  const [balances, setBalances] = useState<Record<string, number>>({})
 
   // Selecting an item defaults Width/Length to its usual size — still editable
   // per entry (e.g. a custom-cut length shorter than the full roll).
@@ -89,13 +135,16 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
     // Voided entries drop off this list; they stay in the item's history in Stocks.
     const query = supabase.from(config.table).select('*, item:items(item_code, description, width, width_unit, length, length_unit)').is('voided_at', null)
     const { data } = await (year ? query.or(yearFilter(year)) : query).order('created_at', { ascending: false }).limit(50)
-    setRecent((data as RecentRow[]) ?? [])
-  }, [config.table, config.showCatalog, year])
+    const rows = (data as RecentRow[]) ?? []
+    setRecent(rows)
+    if (showsBalance) setBalances(await loadEndingBalances(rows, year))
+  }, [config.table, config.showCatalog, year, showsBalance])
 
   useEffect(() => {
     loadRecent()
   }, [loadRecent])
-  useRealtime(config.showCatalog ? [] : [config.table], loadRecent)
+  // Balances also move when stock is received, split or adjusted elsewhere.
+  useRealtime(config.showCatalog ? [] : showsBalance ? [config.table, 'inventory_transactions'] : [config.table], loadRecent)
 
   const qty = Number(quantity)
   const overStock = config.checksStock && item != null && qty > Number(item.on_hand)
@@ -399,6 +448,7 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
                   <th className="text-right">L</th>
                   <th>L-UM</th>
                   <th className="text-right">Qty</th>
+                  {showsBalance && <th className="text-right whitespace-nowrap">Ending Bal.</th>}
                   {config.fields.map((f) => (
                     <th key={f.name}>{f.label}</th>
                   ))}
@@ -418,6 +468,9 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
                     <td className="text-right">{r.length ?? r.item?.length ?? ''}</td>
                     <td>{r.length_unit ?? r.item?.length_unit ?? ''}</td>
                     <td className="text-right">{formatQty(r.quantity)}</td>
+                    {showsBalance && (
+                      <td className="text-right font-semibold">{balances[r.id] != null ? formatQty(balances[r.id]) : ''}</td>
+                    )}
                     {config.fields.map((f) => (
                       <td key={f.name}>{String(r[f.name] ?? '')}</td>
                     ))}
@@ -432,7 +485,7 @@ export function MovementPage({ config, hideTitle }: { config: MovementConfig; hi
                 ))}
                 {visibleRecent.length === 0 && (
                   <tr>
-                    <td colSpan={8 + config.fields.length} className="text-center text-slate-400 py-6">
+                    <td colSpan={8 + config.fields.length + (showsBalance ? 1 : 0)} className="text-center text-slate-400 py-6">
                       {recent.length === 0 ? 'No entries yet.' : 'No entries match that filter.'}
                     </td>
                   </tr>
