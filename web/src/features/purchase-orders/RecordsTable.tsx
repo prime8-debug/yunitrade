@@ -154,6 +154,21 @@ export function RecordsTable({ table, noun, fields, dateField, statusIn, statusN
   }
 
   // Picking a PO No. that's already on file fills in its supplier when that's still empty.
+  /**
+   * Puts the cursor in another field of this form. The browser closes its suggestion list
+   * after the pick and may hand focus back to the box it came from, so check again shortly
+   * after and move it once more if that happened.
+   */
+  function moveFocus(from: HTMLElement, toField: string) {
+    const go = () => {
+      const target = document.getElementById(`${table}-${toField}`)
+      if (target && (document.activeElement === from || document.activeElement === document.body)) target.focus()
+    }
+    setTimeout(go, 0)
+    setTimeout(go, 120)
+    setTimeout(go, 300)
+  }
+
   function isSuggested(f: RecordField, value: string) {
     const v = value.trim().toUpperCase()
     if (f.suggest === 'sales_code') return sheetItemByCode.has(v)
@@ -356,9 +371,14 @@ export function RecordsTable({ table, noun, fields, dateField, statusIn, statusN
                       onChange={(e) => {
                         changeField(f.name, e.target.value)
                         // Picking a suggestion (not typing) moves on to the next box.
-                        if (f.nextOnPick && isSuggestionPick(e) && isSuggested(f, e.target.value)) {
-                          setTimeout(() => document.getElementById(`${table}-${f.nextOnPick}`)?.focus(), 0)
-                        }
+                        if (f.nextOnPick && isSuggestionPick(e) && isSuggested(f, e.target.value)) moveFocus(e.target, f.nextOnPick)
+                      }}
+                      onKeyDown={(e) => {
+                        // Enter on a code that's already filled in moves on, instead of saving the form half-filled.
+                        // (Left alone otherwise, so Enter can still pick from the open suggestion list.)
+                        if (e.key !== 'Enter' || !f.nextOnPick || !isSuggested(f, e.currentTarget.value)) return
+                        e.preventDefault()
+                        moveFocus(e.currentTarget, f.nextOnPick)
                       }}
                     />
                     {f.suggest === 'sales_code' ? (
