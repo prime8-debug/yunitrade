@@ -33,6 +33,7 @@ export const PO_NAV: NavEntry[] = [
   { to: '/po/received', label: 'Received' },
   { to: '/po/samples', label: 'Samples' },
   { to: '/po/notes', label: 'Notes' },
+  { to: '/po/settings', label: 'Settings' },
 ]
 
 const THEME: Record<Workspace, { name: string; aside: string; header: string; active: string; hover: string; border: string; muted: string }> = {

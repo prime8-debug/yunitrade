@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { errorMessage } from '../../lib/supabase'
 import { refreshPoItems, savePoItemsUrl, usePoItems } from '../../lib/usePoItems'
 import { RecordsTable, type RecordAction, type RecordField } from './RecordsTable'
@@ -32,57 +33,86 @@ function ItemsSheetLink() {
     }
   }
 
-  if (editing || url === null) {
-    return (
-      <form onSubmit={save} className="card p-4 mb-4 space-y-2">
-        <div className="text-sm text-slate-700">
-          <b>Item codes sheet link</b> — the Item Code suggestions come from the ITEMCODES tab (A item code, B description, C width, E length).
-          In Google Sheets: File → Share → Publish to web → pick the <b>ITEMCODES</b> tab and <b>CSV</b> → Publish, then paste the link here.
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <input
-            className="input font-mono text-xs flex-1 min-w-[16rem]"
-            placeholder="https://docs.google.com/spreadsheets/d/e/…/pub?gid=…&single=true&output=csv"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-          <button className="btn-primary" disabled={saving}>
-            {saving ? 'Saving…' : 'Save link'}
+  // The saved link is never shown; it can only be replaced.
+  return (
+    <div className="card p-5 space-y-3 max-w-3xl">
+      <div>
+        <h2 className="font-semibold text-slate-700">Item codes sheet</h2>
+        <p className="text-sm text-slate-500">
+          The Item Code suggestions on Orders come from the ITEMCODES tab: A item code, B description, C width, E length.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        {url === undefined ? (
+          <span className="text-slate-400">Checking…</span>
+        ) : url === null ? (
+          <span className="badge bg-amber-100 text-amber-800">No link saved</span>
+        ) : (
+          <>
+            <span className="badge bg-green-100 text-green-800">Link saved</span>
+            <span className="text-slate-500">{loading && items.length === 0 ? 'Loading item codes…' : `${items.length} item codes loaded`}</span>
+            <button className="text-xs underline text-slate-600" onClick={() => refreshPoItems(true)} disabled={loading}>
+              Refresh
+            </button>
+          </>
+        )}
+        {url !== undefined && !editing && (
+          <button
+            className="text-xs underline text-slate-600"
+            onClick={() => {
+              setDraft('')
+              setEditing(true)
+            }}
+          >
+            {url ? 'Replace link' : 'Add link'}
           </button>
-          {url && (
+        )}
+      </div>
+      {error && <div className="text-sm text-red-600">{error}</div>}
+
+      {editing && (
+        <form onSubmit={save} className="space-y-2 border-t border-slate-100 pt-3">
+          <div className="text-xs text-slate-500">
+            In Google Sheets: File → Share → Publish to web → pick the <b>ITEMCODES</b> tab and <b>CSV</b> → Publish, then paste the link here.
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <input
+              className="input font-mono text-xs flex-1 min-w-[16rem]"
+              placeholder="https://docs.google.com/spreadsheets/d/e/…/pub?gid=…&single=true&output=csv"
+              autoComplete="off"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+            />
+            <button className="btn-primary" disabled={saving}>
+              {saving ? 'Saving…' : 'Save link'}
+            </button>
             <button type="button" className="btn-secondary" onClick={() => setEditing(false)}>
               Cancel
             </button>
-          )}
-        </div>
-        {saveError && <div className="text-sm text-red-600">{saveError}</div>}
-      </form>
-    )
-  }
-
-  return (
-    <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-      <span>
-        {url === undefined || (loading && items.length === 0) ? 'Loading item codes…' : `${items.length} item codes from the ITEMCODES sheet`}
-      </span>
-      {error && <span className="text-red-600">{error}</span>}
-      <button className="underline" onClick={() => refreshPoItems(true)} disabled={loading}>
-        Refresh
-      </button>
-      <button
-        className="underline"
-        onClick={() => {
-          setDraft(url ?? '')
-          setEditing(true)
-        }}
-      >
-        Change sheet link
-      </button>
+          </div>
+          {saveError && <div className="text-sm text-red-600">{saveError}</div>}
+        </form>
+      )}
     </div>
   )
 }
 
-export type SubTab ='orders' | 'shipments' | 'received' | 'samples' | 'notes'
+/** On Orders: only speaks up when the suggestions can't work. */
+function ItemsSheetNotice() {
+  const { url, error } = usePoItems()
+  if (url !== null && !error) return null
+  return (
+    <div className="mb-3 text-xs text-amber-700">
+      {url === null ? 'Item Code suggestions are off — no item codes sheet link is saved.' : `Item codes couldn't load: ${error}`}{' '}
+      <Link to="/po/settings" className="underline">
+        Open Settings
+      </Link>
+    </div>
+  )
+}
+
+export type SubTab = 'orders' | 'shipments' | 'received' | 'samples' | 'notes' | 'settings'
 
 const TABS: { id: SubTab; label: string }[] = [
   { id: 'orders', label: 'Orders' },
@@ -90,6 +120,7 @@ const TABS: { id: SubTab; label: string }[] = [
   { id: 'received', label: 'Received' },
   { id: 'samples', label: 'Samples' },
   { id: 'notes', label: 'Notes' },
+  { id: 'settings', label: 'Settings' },
 ]
 
 const today = () => new Date().toLocaleDateString('en-CA')
@@ -188,7 +219,8 @@ export function PurchaseOrdersPage({ section: tab }: { section: SubTab }) {
     <div>
       <h1 className="page-title">{TABS.find((t) => t.id === tab)?.label}</h1>
 
-      {tab === 'orders' && <ItemsSheetLink />}
+      {tab === 'orders' && <ItemsSheetNotice />}
+      {tab === 'settings' && <ItemsSheetLink />}
       {tab === 'orders' && (
         <RecordsTable key="orders" table="purchase_orders" noun="Order" fields={ORDER_FIELDS} dateField="po_date" emptyText="No purchase orders yet." />
       )}

@@ -56,7 +56,7 @@ function Gate() {
       {isAdmin && (
         <Route path="po" element={<Layout workspace="purchase" />}>
           <Route index element={<Navigate to="/po/orders" replace />} />
-          {(['orders', 'shipments', 'received', 'samples', 'notes'] as const).map((s) => (
+          {(['orders', 'shipments', 'received', 'samples', 'notes', 'settings'] as const).map((s) => (
             <Route key={s} path={s} element={<PurchaseOrdersPage key={s} section={s} />} />
           ))}
         </Route>
