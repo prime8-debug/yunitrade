@@ -5,6 +5,7 @@ import { Layout, NAV } from './components/Layout'
 import { ItemsPage } from './features/items/ItemsPage'
 import { BEGINNING, RECEIVED } from './features/movements/configs'
 import { MovementPage } from './features/movements/MovementPage'
+import { PurchaseOrdersPage } from './features/purchase-orders/PurchaseOrdersPage'
 import { SalesOrdersPage } from './features/sales-orders/SalesOrdersPage'
 import { StocksPage } from './features/stocks/StocksPage'
 import { WithdrawPage } from './features/withdraw/WithdrawPage'
@@ -13,6 +14,7 @@ import { PartialRollsPage } from './features/partial/PartialRollsPage'
 import { supabaseConfigured } from './lib/supabase'
 import { ComingSoon } from './pages/ComingSoon'
 import { LoginPage } from './pages/LoginPage'
+import { WorkspacePicker } from './pages/WorkspacePicker'
 
 function Gate() {
   const { session, profile, loading, isAdmin, signOut } = useAuth()
@@ -34,8 +36,11 @@ function Gate() {
 
   return (
     <Routes>
-      <Route element={<Layout />}>
-        <Route index element={<StocksPage />} />
+      {/* Home: ADMINs pick their work; everyone else only has Inventory. */}
+      <Route index element={isAdmin ? <WorkspacePicker /> : <Navigate to="/stocks" replace />} />
+
+      <Route element={<Layout workspace="inventory" />}>
+        <Route path="stocks" element={<StocksPage />} />
         <Route path="beginning" element={isAdmin ? <MovementPage key="beginning" config={BEGINNING} /> : <Navigate to="/" />} />
         <Route path="withdraw" element={<WithdrawPage />} />
         <Route path="received" element={<MovementPage key="received" config={RECEIVED} />} />
@@ -46,8 +51,19 @@ function Gate() {
         {NAV.filter((n) => n.soon).map((n) => (
           <Route key={n.to} path={n.to.slice(1)} element={<ComingSoon title={n.label} />} />
         ))}
-        <Route path="*" element={<Navigate to="/" />} />
       </Route>
+
+      {isAdmin && (
+        <Route path="po" element={<Layout workspace="purchase" />}>
+          <Route index element={<Navigate to="/po/orders" replace />} />
+          {(['orders', 'shipments', 'received', 'samples', 'notes'] as const).map((s) => (
+            <Route key={s} path={s} element={<PurchaseOrdersPage key={s} section={s} />} />
+          ))}
+        </Route>
+      )}
+      {/* Old link from before the workspaces. */}
+      <Route path="purchase-orders" element={<Navigate to="/po/orders" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }
