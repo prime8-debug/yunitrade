@@ -134,12 +134,29 @@ const ORDER_FIELDS: RecordField[] = [
   { name: 'width', label: 'Width', type: 'number' },
   { name: 'length', label: 'Length', type: 'number' },
   { name: 'quantity', label: 'Qty', type: 'number' },
-  { name: 'eta', label: 'ETA', type: 'date' },
   { name: 'status', label: 'Status', type: 'select', required: true, options: ['Ordered', 'Partially Shipped', 'Shipped', 'Received', 'Cancelled'] },
   { name: 'remarks', label: 'Remarks', wide: true },
 ]
 
-const SHIPMENT_STATUSES = ['In Transit', 'Arrived', 'Customs', 'Delayed', 'Received']
+// New / edit order form, two rows; Save and Cancel sit at the end of the second.
+const ORDER_FORM_ROWS = [
+  [
+    { name: 'po_date', className: 'w-40' },
+    { name: 'po_no', className: 'w-52' },
+    { name: 'item_code', className: 'flex-1 min-w-[12rem]' },
+    { name: 'description', className: 'flex-1 min-w-[12rem]' },
+    { name: 'supplier', className: 'flex-1 min-w-[12rem]' },
+  ],
+  [
+    { name: 'quantity', className: 'w-40' },
+    { name: 'width', className: 'w-28' },
+    { name: 'length', className: 'w-28' },
+    { name: 'status', className: 'w-48' },
+    { name: 'remarks', className: 'w-full sm:w-96' },
+  ],
+]
+
+const SHIPMENT_STATUSES =['In Transit', 'Arrived', 'Customs', 'Delayed', 'Received']
 
 const SHIPMENT_FIELDS: RecordField[] = [
   { name: 'ship_date', label: 'Ship Date', type: 'date' },
@@ -222,7 +239,7 @@ export function PurchaseOrdersPage({ section: tab }: { section: SubTab }) {
       {tab === 'orders' && <ItemsSheetNotice />}
       {tab === 'settings' && <ItemsSheetLink />}
       {tab === 'orders' && (
-        <RecordsTable key="orders" table="purchase_orders" noun="Order" fields={ORDER_FIELDS} dateField="po_date" emptyText="No purchase orders yet." />
+        <RecordsTable key="orders" table="purchase_orders" noun="Order" fields={ORDER_FIELDS} formRows={ORDER_FORM_ROWS} dateField="po_date" emptyText="No purchase orders yet." />
       )}
       {tab === 'shipments' && (
         <RecordsTable

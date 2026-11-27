@@ -45,6 +45,11 @@ interface Props {
   /** Hide the Add button (e.g. Received only lists what came in). */
   readOnlyAdd?: boolean
   emptyText?: string
+  /**
+   * Fixed form arrangement: rows of fields, each with its width classes. Fields not listed
+   * aren't shown in the form. Without it, the form is a plain grid in `fields` order.
+   */
+  formRows?: { name: string; className: string }[][]
 }
 
 const today = () => new Date().toLocaleDateString('en-CA')
@@ -71,7 +76,7 @@ function display(f: RecordField, value: unknown) {
 }
 
 /** Add / edit / delete list for one Purchase Orders sub-tab. ADMIN only (enforced in the database too). */
-export function RecordsTable({ table, noun, fields, dateField, statusIn, statusNotIn, defaults, actions, readOnlyAdd, emptyText }: Props) {
+export function RecordsTable({ table, noun, fields, dateField, statusIn, statusNotIn, defaults, actions, readOnlyAdd, emptyText, formRows }: Props) {
   const [rows, setRows] = useState<Row[]>([])
   const [loaded, setLoaded] = useState(false)
   const [query, setQuery] = useState('')
@@ -210,6 +215,17 @@ export function RecordsTable({ table, noun, fields, dateField, statusIn, statusN
     else load()
   }
 
+  const buttons = (
+    <div className="flex gap-3">
+      <button className="btn-primary" disabled={busy}>
+        {busy ? 'Saving…' : 'Save'}
+      </button>
+      <button type="button" className="btn-secondary" disabled={busy} onClick={() => setEditingId(null)}>
+        Cancel
+      </button>
+    </div>
+  )
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -225,63 +241,25 @@ export function RecordsTable({ table, noun, fields, dateField, statusIn, statusN
       {editingId !== null && (
         <form onSubmit={save} className="card p-5 space-y-4">
           <div className="font-semibold text-slate-700">{editingId === 'new' ? `New ${noun.toLowerCase()}` : `Edit ${noun.toLowerCase()}`}</div>
-          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
-            {fields.map((f) => (
-              <label key={f.name} className={f.wide || f.type === 'textarea' ? 'md:col-span-3 lg:col-span-4' : ''}>
-                <span className="label">
-                  {f.label}
-                  {f.required && <span className="text-red-500"> *</span>}
-                </span>
-                {f.type === 'textarea' ? (
-                  <textarea className="input min-h-[6rem]" value={form[f.name] ?? ''} onChange={(e) => changeField(f.name, e.target.value)} />
-                ) : f.type === 'select' ? (
-                  <select className="input" value={form[f.name] ?? ''} onChange={(e) => changeField(f.name, e.target.value)}>
-                    {!f.required && <option value="" />}
-                    {(f.options ?? []).map((o) => (
-                      <option key={o} value={o}>
-                        {o}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <>
-                    <input
-                      className="input"
-                      type={f.type === 'date' ? 'date' : 'text'}
-                      inputMode={f.type === 'number' ? 'decimal' : undefined}
-                      list={f.suggest ? `${table}-${f.name}-suggestions` : undefined}
-                      autoComplete="off"
-                      value={form[f.name] ?? ''}
-                      onChange={(e) => changeField(f.name, e.target.value)}
-                    />
-                    {f.suggest === 'sales_code' ? (
-                      <datalist id={`${table}-${f.name}-suggestions`}>
-                        {sheetItems.map((i) => (
-                          <option key={i.code} value={i.code} label={i.description} />
-                        ))}
-                      </datalist>
-                    ) : (
-                      f.suggest && (
-                        <datalist id={`${table}-${f.name}-suggestions`}>
-                          {(suggestions[f.suggest] ?? []).map((s) => (
-                            <option key={s} value={s} />
-                          ))}
-                        </datalist>
-                      )
-                    )}
-                  </>
-                )}
-              </label>
-            ))}
-          </div>
-          <div className="flex gap-3">
-            <button className="btn-primary" disabled={busy}>
-              {busy ? 'Saving…' : 'Save'}
-            </button>
-            <button type="button" className="btn-secondary" disabled={busy} onClick={() => setEditingId(null)}>
-              Cancel
-            </button>
-          </div>
+          {formRows ? (
+            // Fixed arrangement: each row left to right, Save / Cancel at the end of the last row.
+            formRows.map((row, i) => (
+              <div key={i} className="flex flex-wrap items-end gap-4">
+                {row.map((cell) => {
+                  const f = fields.find((x) => x.name === cell.name)
+                  return f ? renderField(f, cell.className) : null
+                })}
+                {i === formRows.length - 1 && buttons}
+              </div>
+            ))
+          ) : (
+            <>
+              <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
+                {fields.map((f) => renderField(f, f.wide || f.type === 'textarea' ? 'md:col-span-3 lg:col-span-4' : ''))}
+              </div>
+              {buttons}
+            </>
+          )}
         </form>
       )}
 
@@ -337,4 +315,54 @@ export function RecordsTable({ table, noun, fields, dateField, statusIn, statusN
       </div>
     </div>
   )
+
+  function renderField(f: RecordField, className: string) {
+    return (
+              <label key={f.name} className={className}>
+                <span className="label">
+                  {f.label}
+                  {f.required && <span className="text-red-500"> *</span>}
+                </span>
+                {f.type === 'textarea' ? (
+                  <textarea className="input min-h-[6rem]" value={form[f.name] ?? ''} onChange={(e) => changeField(f.name, e.target.value)} />
+                ) : f.type === 'select' ? (
+                  <select className="input" value={form[f.name] ?? ''} onChange={(e) => changeField(f.name, e.target.value)}>
+                    {!f.required && <option value="" />}
+                    {(f.options ?? []).map((o) => (
+                      <option key={o} value={o}>
+                        {o}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <>
+                    <input
+                      className="input"
+                      type={f.type === 'date' ? 'date' : 'text'}
+                      inputMode={f.type === 'number' ? 'decimal' : undefined}
+                      list={f.suggest ? `${table}-${f.name}-suggestions` : undefined}
+                      autoComplete="off"
+                      value={form[f.name] ?? ''}
+                      onChange={(e) => changeField(f.name, e.target.value)}
+                    />
+                    {f.suggest === 'sales_code' ? (
+                      <datalist id={`${table}-${f.name}-suggestions`}>
+                        {sheetItems.map((i) => (
+                          <option key={i.code} value={i.code} label={i.description} />
+                        ))}
+                      </datalist>
+                    ) : (
+                      f.suggest && (
+                        <datalist id={`${table}-${f.name}-suggestions`}>
+                          {(suggestions[f.suggest] ?? []).map((s) => (
+                            <option key={s} value={s} />
+                          ))}
+                        </datalist>
+                      )
+                    )}
+                  </>
+                )}
+              </label>
+    )
+  }
 }
