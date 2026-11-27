@@ -34,7 +34,24 @@ const CARDS = [
       </svg>
     ),
   },
-]
+  {
+    // A separate app: opens in a new browser tab so this one stays open.
+    href: 'https://landed-cost-ten.vercel.app/',
+    title: 'Landed Cost',
+    text: 'Work out the landed cost of imported goods.',
+    sections: [],
+    accent: 'bg-emerald-700 text-white',
+    ring: 'hover:border-emerald-400',
+    icon: (
+      // Calculator
+      <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="5" y="3" width="14" height="18" rx="2" />
+        <path d="M8 7h8" />
+        <path d="M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 15.5h.01M12 15.5h.01M15.5 15.5h.01M8.5 19h.01M12 19h.01M15.5 19h.01" />
+      </svg>
+    ),
+  },
+] as { to?: string; href?: string; title: string; text: string; sections: string[]; accent: string; ring: string; icon: JSX.Element }[]
 
 /** Home screen for ADMIN accounts: pick which work to do. */
 export function WorkspacePicker() {
@@ -56,26 +73,38 @@ export function WorkspacePicker() {
           </div>
         </div>
 
-        <div className="grid gap-5 md:grid-cols-2">
-          {CARDS.map((c) => (
-            <Link
-              key={c.to}
-              to={c.to}
-              className={`card group block p-6 transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${c.ring}`}
-            >
-              <div className={`mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg ${c.accent}`}>{c.icon}</div>
-              <h2 className="text-lg font-semibold text-slate-800">{c.title}</h2>
-              <p className="mt-1 text-sm text-slate-500">{c.text}</p>
-              <div className="mt-4 flex flex-wrap gap-1.5">
-                {c.sections.map((s) => (
-                  <span key={s} className="badge font-medium">
-                    {s}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-5 text-sm font-medium text-blue-700 group-hover:underline">Open {c.title} →</div>
-            </Link>
-          ))}
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {CARDS.map((c) => {
+            const className = `card group flex flex-col p-6 transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${c.ring}`
+            const body = (
+              <>
+                <div className={`mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg ${c.accent}`}>{c.icon}</div>
+                <h2 className="text-lg font-semibold text-slate-800">{c.title}</h2>
+                <p className="mt-1 text-sm text-slate-500">{c.text}</p>
+                {c.sections.length > 0 && (
+                  <div className="mt-4 flex flex-wrap gap-1.5">
+                    {c.sections.map((s) => (
+                      <span key={s} className="badge font-medium">
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-auto pt-5 text-sm font-medium text-blue-700 group-hover:underline">
+                  Open {c.title} {c.href ? '↗' : '→'}
+                </div>
+              </>
+            )
+            return c.href ? (
+              <a key={c.href} href={c.href} target="_blank" rel="noopener noreferrer" className={className}>
+                {body}
+              </a>
+            ) : (
+              <Link key={c.to} to={c.to!} className={className}>
+                {body}
+              </Link>
+            )
+          })}
         </div>
       </div>
     </div>
