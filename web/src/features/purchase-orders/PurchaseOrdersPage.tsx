@@ -1,4 +1,86 @@
+import { useState, type FormEvent } from 'react'
+import { errorMessage } from '../../lib/supabase'
+import { refreshPoItems, savePoItemsUrl, usePoItems } from '../../lib/usePoItems'
 import { RecordsTable, type RecordAction, type RecordField } from './RecordsTable'
+
+/**
+ * The ITEMCODES sheet tab (Publish to web → CSV) behind the Item Code suggestions on Orders:
+ * column A item code, B description, C width, E length.
+ */
+function ItemsSheetLink() {
+  const { items, url, loading, error } = usePoItems()
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  async function save(e: FormEvent) {
+    e.preventDefault()
+    const value = draft.trim()
+    if (!/^https:\/\/docs\.google\.com\/spreadsheets\/.+output=csv/.test(value)) {
+      return setSaveError('Paste the link from File → Share → Publish to web, with the ITEMCODES tab and CSV picked (it ends in output=csv).')
+    }
+    setSaving(true)
+    try {
+      await savePoItemsUrl(value)
+      setSaveError(null)
+      setEditing(false)
+    } catch (err) {
+      setSaveError(errorMessage(err))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (editing || url === null) {
+    return (
+      <form onSubmit={save} className="card p-4 mb-4 space-y-2">
+        <div className="text-sm text-slate-700">
+          <b>Item codes sheet link</b> — the Item Code suggestions come from the ITEMCODES tab (A item code, B description, C width, E length).
+          In Google Sheets: File → Share → Publish to web → pick the <b>ITEMCODES</b> tab and <b>CSV</b> → Publish, then paste the link here.
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <input
+            className="input font-mono text-xs flex-1 min-w-[16rem]"
+            placeholder="https://docs.google.com/spreadsheets/d/e/…/pub?gid=…&single=true&output=csv"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+          />
+          <button className="btn-primary" disabled={saving}>
+            {saving ? 'Saving…' : 'Save link'}
+          </button>
+          {url && (
+            <button type="button" className="btn-secondary" onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+          )}
+        </div>
+        {saveError && <div className="text-sm text-red-600">{saveError}</div>}
+      </form>
+    )
+  }
+
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+      <span>
+        {url === undefined || (loading && items.length === 0) ? 'Loading item codes…' : `${items.length} item codes from the ITEMCODES sheet`}
+      </span>
+      {error && <span className="text-red-600">{error}</span>}
+      <button className="underline" onClick={() => refreshPoItems(true)} disabled={loading}>
+        Refresh
+      </button>
+      <button
+        className="underline"
+        onClick={() => {
+          setDraft(url ?? '')
+          setEditing(true)
+        }}
+      >
+        Change sheet link
+      </button>
+    </div>
+  )
+}
 
 export type SubTab ='orders' | 'shipments' | 'received' | 'samples' | 'notes'
 
@@ -16,8 +98,10 @@ const ORDER_FIELDS: RecordField[] = [
   { name: 'po_date', label: 'PO Date', type: 'date', required: true },
   { name: 'po_no', label: 'PO No.', required: true, suggest: 'po_no' },
   { name: 'supplier', label: 'Supplier', suggest: 'supplier' },
-  { name: 'item_code', label: 'Item Code', suggest: 'item_code' },
+  { name: 'item_code', label: 'Item Code', suggest: 'sales_code' },
   { name: 'description', label: 'Description' },
+  { name: 'width', label: 'Width', type: 'number' },
+  { name: 'length', label: 'Length', type: 'number' },
   { name: 'quantity', label: 'Qty', type: 'number' },
   { name: 'eta', label: 'ETA', type: 'date' },
   { name: 'status', label: 'Status', type: 'select', required: true, options: ['Ordered', 'Partially Shipped', 'Shipped', 'Received', 'Cancelled'] },
@@ -104,6 +188,7 @@ export function PurchaseOrdersPage({ section: tab }: { section: SubTab }) {
     <div>
       <h1 className="page-title">{TABS.find((t) => t.id === tab)?.label}</h1>
 
+      {tab === 'orders' && <ItemsSheetLink />}
       {tab === 'orders' && (
         <RecordsTable key="orders" table="purchase_orders" noun="Order" fields={ORDER_FIELDS} dateField="po_date" emptyText="No purchase orders yet." />
       )}

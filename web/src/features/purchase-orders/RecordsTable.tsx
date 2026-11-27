@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
 import { formatQty } from '../../lib/types'
+import { usePoItems } from '../../lib/usePoItems'
 
 export interface RecordField {
   name: string
@@ -9,8 +10,11 @@ export interface RecordField {
   type?: 'text' | 'date' | 'number' | 'textarea' | 'select'
   options?: string[]
   required?: boolean
-  /** Suggest values already used elsewhere (PO numbers, suppliers, our item codes). */
-  suggest?: 'po_no' | 'supplier' | 'item_code'
+  /**
+   * Suggest values already used elsewhere (PO numbers, suppliers, our item codes), or
+   * 'sales_code': codes from the Items sheet — picking one fills description, width and length.
+   */
+  suggest?: 'po_no' | 'supplier' | 'item_code' | 'sales_code'
   /** Leave out of the table (still in the form). */
   hideInTable?: boolean
   /** Takes the full form width. */
@@ -54,6 +58,12 @@ function blankForm(fields: RecordField[], defaults: Record<string, string> = {})
   return form
 }
 
+/** "48", "48 in" or "48.5in" from the sheet → "48" / "48.5" for a number box; anything else unchanged. */
+function sizeNumber(value: string) {
+  const m = value.trim().match(/^-?\d+(?:\.\d+)?/)
+  return m ? m[0] : value.trim()
+}
+
 function display(f: RecordField, value: unknown) {
   if (value == null || value === '') return ''
   if (f.type === 'number') return formatQty(Number(value))
@@ -70,6 +80,9 @@ export function RecordsTable({ table, noun, fields, dateField, statusIn, statusN
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
   const [suggestions, setSuggestions] = useState<Record<string, string[]>>({})
+  const usesSheetItems = fields.some((f) => f.suggest === 'sales_code')
+  const { items: sheetItems } = usePoItems(usesSheetItems)
+  const sheetItemByCode = useMemo(() => new Map(sheetItems.map((i) => [i.code.toUpperCase(), i])), [sheetItems])
 
   const load = useCallback(async () => {
     let q = supabase.from(table).select('*')
@@ -135,6 +148,22 @@ export function RecordsTable({ table, noun, fields, dateField, statusIn, statusN
   // Picking a PO No. that's already on file fills in its supplier when that's still empty.
   async function changeField(name: string, value: string) {
     setForm((f) => ({ ...f, [name]: value }))
+
+    // Picking an Items sheet code fills its description and size (all still editable).
+    if (fields.find((f) => f.name === name)?.suggest === 'sales_code') {
+      const item = sheetItemByCode.get(value.trim().toUpperCase())
+      if (item) {
+        const has = (n: string) => fields.some((f) => f.name === n)
+        setForm((f) => ({
+          ...f,
+          ...(has('description') && { description: item.description }),
+          ...(has('width') && { width: sizeNumber(item.width) }),
+          ...(has('length') && { length: sizeNumber(item.length) }),
+        }))
+      }
+      return
+    }
+
     if (name !== 'po_no' || table === 'purchase_orders' || !fields.some((f) => f.name === 'supplier')) return
     if (!suggestions.po_no?.includes(value.trim())) return
     const { data } = await supabase.from('purchase_orders').select('supplier').eq('po_no', value.trim()).not('supplier', 'is', null).limit(1)
@@ -225,12 +254,20 @@ export function RecordsTable({ table, noun, fields, dateField, statusIn, statusN
                       value={form[f.name] ?? ''}
                       onChange={(e) => changeField(f.name, e.target.value)}
                     />
-                    {f.suggest && (
+                    {f.suggest === 'sales_code' ? (
                       <datalist id={`${table}-${f.name}-suggestions`}>
-                        {(suggestions[f.suggest] ?? []).map((s) => (
-                          <option key={s} value={s} />
+                        {sheetItems.map((i) => (
+                          <option key={i.code} value={i.code} label={i.description} />
                         ))}
                       </datalist>
+                    ) : (
+                      f.suggest && (
+                        <datalist id={`${table}-${f.name}-suggestions`}>
+                          {(suggestions[f.suggest] ?? []).map((s) => (
+                            <option key={s} value={s} />
+                          ))}
+                        </datalist>
+                      )
                     )}
                   </>
                 )}

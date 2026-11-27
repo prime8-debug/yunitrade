@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 
@@ -51,7 +52,7 @@ const CARDS = [
       </svg>
     ),
   },
-] as { to?: string; href?: string; title: string; text: string; sections: string[]; accent: string; ring: string; icon: JSX.Element }[]
+] as { to?: string; href?: string; title: string; text: string; sections: string[]; accent: string; ring: string; icon: ReactNode }[]
 
 /** Home screen for ADMIN accounts: pick which work to do. */
 export function WorkspacePicker() {
