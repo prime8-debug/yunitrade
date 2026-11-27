@@ -129,7 +129,7 @@ const ORDER_FIELDS: RecordField[] = [
   { name: 'po_date', label: 'PO Date', type: 'date', required: true },
   { name: 'po_no', label: 'PO No.', required: true, suggest: 'po_no' },
   { name: 'supplier', label: 'Supplier', suggest: 'supplier' },
-  { name: 'item_code', label: 'Item Code', suggest: 'sales_code' },
+  { name: 'item_code', label: 'Item Code', suggest: 'sales_code', nextOnPick: 'supplier' },
   { name: 'description', label: 'Description' },
   { name: 'width', label: 'Width', type: 'number' },
   { name: 'length', label: 'Length', type: 'number' },

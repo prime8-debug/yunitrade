@@ -30,15 +30,26 @@ function setState(patch: Partial<State>) {
 export function toPoItems(text: string): PoItem[] {
   const [, ...rows] = parseCsv(text) // row 1 is the header
   const cell = (r: string[], i: number) => (r[i] ?? '').trim()
-  const seen = new Set<string>()
-  const items: PoItem[] = []
+  // A code can be listed more than once (e.g. SPYBK_HM on one row without a size and again
+  // with 42 × 500). Keep one entry per code, filling its blanks from the later rows.
+  const byCode = new Map<string, PoItem>()
   for (const r of rows) {
     const code = cell(r, COL.code)
-    if (!code || seen.has(code.toUpperCase())) continue
-    seen.add(code.toUpperCase())
-    items.push({ code, description: cell(r, COL.description), width: cell(r, COL.width), length: cell(r, COL.length) })
+    if (!code) continue
+    const row = { code, description: cell(r, COL.description), width: cell(r, COL.width), length: cell(r, COL.length) }
+    const prev = byCode.get(code.toUpperCase())
+    if (!prev) {
+      byCode.set(code.toUpperCase(), row)
+      continue
+    }
+    if (!prev.description) prev.description = row.description
+    // Width and length go together, so take both from the first row that has a size.
+    if (!prev.width && !prev.length) {
+      prev.width = row.width
+      prev.length = row.length
+    }
   }
-  return items.sort((a, b) => a.code.localeCompare(b.code))
+  return [...byCode.values()].sort((a, b) => a.code.localeCompare(b.code))
 }
 
 /** Loads the Items sheet (at most every 5 minutes unless forced). */

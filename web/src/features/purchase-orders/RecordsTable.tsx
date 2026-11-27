@@ -3,6 +3,7 @@ import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
 import { formatQty } from '../../lib/types'
 import { usePoItems } from '../../lib/usePoItems'
+import { isSuggestionPick } from '../../lib/useSalesOrders'
 
 export interface RecordField {
   name: string
@@ -15,6 +16,8 @@ export interface RecordField {
    * 'sales_code': codes from the Items sheet — picking one fills description, width and length.
    */
   suggest?: 'po_no' | 'supplier' | 'item_code' | 'sales_code'
+  /** After a suggestion is picked from the list (not typed), put the cursor in this field. */
+  nextOnPick?: string
   /** Leave out of the table (still in the form). */
   hideInTable?: boolean
   /** Takes the full form width. */
@@ -151,6 +154,12 @@ export function RecordsTable({ table, noun, fields, dateField, statusIn, statusN
   }
 
   // Picking a PO No. that's already on file fills in its supplier when that's still empty.
+  function isSuggested(f: RecordField, value: string) {
+    const v = value.trim().toUpperCase()
+    if (f.suggest === 'sales_code') return sheetItemByCode.has(v)
+    return !!f.suggest && (suggestions[f.suggest] ?? []).some((s) => s.toUpperCase() === v)
+  }
+
   async function changeField(name: string, value: string) {
     setForm((f) => ({ ...f, [name]: value }))
 
@@ -337,13 +346,20 @@ export function RecordsTable({ table, noun, fields, dateField, statusIn, statusN
                 ) : (
                   <>
                     <input
+                      id={`${table}-${f.name}`}
                       className="input"
                       type={f.type === 'date' ? 'date' : 'text'}
                       inputMode={f.type === 'number' ? 'decimal' : undefined}
                       list={f.suggest ? `${table}-${f.name}-suggestions` : undefined}
                       autoComplete="off"
                       value={form[f.name] ?? ''}
-                      onChange={(e) => changeField(f.name, e.target.value)}
+                      onChange={(e) => {
+                        changeField(f.name, e.target.value)
+                        // Picking a suggestion (not typing) moves on to the next box.
+                        if (f.nextOnPick && isSuggestionPick(e) && isSuggested(f, e.target.value)) {
+                          setTimeout(() => document.getElementById(`${table}-${f.nextOnPick}`)?.focus(), 0)
+                        }
+                      }}
                     />
                     {f.suggest === 'sales_code' ? (
                       <datalist id={`${table}-${f.name}-suggestions`}>
