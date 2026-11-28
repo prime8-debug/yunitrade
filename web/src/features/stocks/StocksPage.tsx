@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
 import { useStockYear } from '../../lib/useStockYear'
+import { useSheetUnits } from '../../lib/useSheetUnits'
 import { formatQty, isLowStock, type StockRow } from '../../lib/types'
 import { ItemHistory } from './ItemHistory'
 
@@ -14,6 +15,7 @@ export function StocksPage() {
   const [lowOnly, setLowOnly] = useState(false)
   const [selected, setSelected] = useState<StockRow | null>(null)
 
+  const sheet = useSheetUnits() // UNIT column, from the ITEMCODE V2 SBASE tab
   const year = useStockYear()
   // Average per month = Withdrawn ÷ this month's number (Jan = 1 … Nov = 11, Dec = 12),
   // or after a year-end clear, ÷ the months since the start date (Dec = 1, Jan = 2 …).
@@ -66,6 +68,7 @@ export function StocksPage() {
       </div>
 
       {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+      {sheet.error && <p className="mb-3 text-sm text-amber-700">{sheet.error}</p>}
 
       <div className="card overflow-x-auto">
         <table className="table">
@@ -77,7 +80,7 @@ export function StocksPage() {
               <th>W-UM</th>
               <th className="text-right">L</th>
               <th>L-UM</th>
-              <th>UOM</th>
+              <th>UNIT</th>
               <th className="text-right">Beginning</th>
               <th className="text-right">Received</th>
               <th className="text-right">Withdrawn</th>
@@ -111,7 +114,7 @@ export function StocksPage() {
                 <td>{r.width_unit ?? ''}</td>
                 <td className="text-right">{r.length ?? ''}</td>
                 <td>{r.length_unit ?? ''}</td>
-                <td>{r.uom ?? ''}</td>
+                <td>{sheet.unitOf(r.item_code)}</td>
                 <td className="text-right">{formatQty(r.beginning)}</td>
                 <td className="text-right">{formatQty(r.received)}</td>
                 <td className="text-right">{formatQty(r.withdrawn)}</td>
