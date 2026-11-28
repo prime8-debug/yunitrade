@@ -21,6 +21,8 @@ export interface Item {
   category: string | null
   active: boolean
   remarks: string | null
+  /** On Hand at or below this is low stock. null = no reminder. */
+  low_stock_level: number | null
 }
 
 export interface StockRow {
@@ -39,6 +41,12 @@ export interface StockRow {
   received: number
   withdrawn: number
   last_movement_at: string | null
+  low_stock_level: number | null
+}
+
+/** True when the item has a low stock level and On Hand is at or below it. */
+export function isLowStock(r: Pick<StockRow, 'on_hand' | 'low_stock_level'>): boolean {
+  return r.low_stock_level != null && Number(r.on_hand) <= Number(r.low_stock_level)
 }
 
 export type TransactionType =

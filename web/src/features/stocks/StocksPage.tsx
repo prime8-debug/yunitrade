@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
 import { useStockYear } from '../../lib/useStockYear'
-import { formatQty, type StockRow } from '../../lib/types'
+import { formatQty, isLowStock, type StockRow } from '../../lib/types'
 import { ItemHistory } from './ItemHistory'
 
 export function StocksPage() {
@@ -11,6 +11,7 @@ export function StocksPage() {
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [hideZero, setHideZero] = useState(false)
+  const [lowOnly, setLowOnly] = useState(false)
   const [selected, setSelected] = useState<StockRow | null>(null)
 
   const year = useStockYear()
@@ -41,15 +42,21 @@ export function StocksPage() {
     return rows.filter(
       (r) =>
         (!hideZero || Number(r.on_hand) !== 0) &&
+        (!lowOnly || isLowStock(r)) &&
         (!q || r.item_code.toLowerCase().includes(q) || r.description.toLowerCase().includes(q)),
     )
-  }, [rows, query, hideZero])
+  }, [rows, query, hideZero, lowOnly])
+  const lowCount = useMemo(() => rows.filter(isLowStock).length, [rows])
 
   return (
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
         <h1 className="page-title mb-0">Stocks</h1>
         <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1 text-sm text-slate-600">
+            <input type="checkbox" checked={lowOnly} onChange={(e) => setLowOnly(e.target.checked)} />
+            Low stock only{lowCount ? ` (${lowCount})` : ''}
+          </label>
           <label className="flex items-center gap-1 text-sm text-slate-600">
             <input type="checkbox" checked={hideZero} onChange={(e) => setHideZero(e.target.checked)} />
             Hide zero stock
@@ -77,20 +84,21 @@ export function StocksPage() {
               <th className="text-right" title={`Withdrawn ÷ ${monthNo} (${year ? 'months since the start date' : "this month's number"})`}>
                 Average per Month
               </th>
+              <th className="text-right">Low Level</th>
               <th className="text-right">On Hand</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={12} className="text-center text-slate-400 py-8">
+                <td colSpan={13} className="text-center text-slate-400 py-8">
                   Loading…
                 </td>
               </tr>
             )}
             {!loading && visible.length === 0 && (
               <tr>
-                <td colSpan={12} className="text-center text-slate-400 py-8">
+                <td colSpan={13} className="text-center text-slate-400 py-8">
                   No items.
                 </td>
               </tr>
@@ -108,7 +116,14 @@ export function StocksPage() {
                 <td className="text-right">{formatQty(r.received)}</td>
                 <td className="text-right">{formatQty(r.withdrawn)}</td>
                 <td className="text-right">{formatQty(Math.round((Number(r.withdrawn) / monthNo) * 100) / 100)}</td>
-                <td className={`text-right font-semibold ${Number(r.on_hand) <= 0 ? 'text-red-600' : ''}`}>{formatQty(r.on_hand)}</td>
+                <td className="text-right text-slate-500">{r.low_stock_level != null ? formatQty(r.low_stock_level) : ''}</td>
+                <td
+                  className={`text-right font-semibold ${Number(r.on_hand) <= 0 ? 'text-red-600' : isLowStock(r) ? 'text-amber-600' : ''}`}
+                  title={isLowStock(r) ? 'Low stock: at or below its low stock level' : undefined}
+                >
+                  {formatQty(r.on_hand)}
+                  {isLowStock(r) && Number(r.on_hand) > 0 ? ' ⚠' : ''}
+                </td>
               </tr>
             ))}
           </tbody>

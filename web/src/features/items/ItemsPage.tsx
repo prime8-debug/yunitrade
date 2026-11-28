@@ -3,7 +3,7 @@ import { errorMessage, supabase } from '../../lib/supabase'
 import { useRealtime } from '../../lib/useRealtime'
 import { formatSize, type Item } from '../../lib/types'
 
-const EMPTY = { item_code: '', description: '', width: '', width_unit: '', length: '', length_unit: '', uom: '', category: '', remarks: '' }
+const EMPTY = { item_code: '', description: '', width: '', width_unit: '', length: '', length_unit: '', uom: '', category: '', remarks: '', low_stock_level: '' }
 
 /** ADMIN: item master data. RLS also blocks non-admin writes server-side. */
 export function ItemsPage() {
@@ -41,6 +41,7 @@ export function ItemsPage() {
       uom: form.uom.trim().toUpperCase() || null,
       category: form.category.trim() || null,
       remarks: form.remarks.trim() || null,
+      low_stock_level: form.low_stock_level === '' ? null : Number(form.low_stock_level),
       updated_at: new Date().toISOString(),
     }
     const { error } = editingId
@@ -64,6 +65,7 @@ export function ItemsPage() {
       uom: i.uom ?? '',
       category: i.category ?? '',
       remarks: i.remarks ?? '',
+      low_stock_level: i.low_stock_level?.toString() ?? '',
     })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -131,6 +133,19 @@ export function ItemsPage() {
           <span className="label">Category</span>
           <input className="input max-w-xs" value={form.category} onChange={set('category')} />
         </label>
+        <label>
+          <span className="label">Low Stock Level</span>
+          <input
+            className="input max-w-xs"
+            type="number"
+            step="any"
+            min="0"
+            placeholder="blank = no reminder"
+            title="When On Hand drops to this or below, the item shows as low stock and Hivedesk sends a reminder."
+            value={form.low_stock_level}
+            onChange={set('low_stock_level')}
+          />
+        </label>
         <label className="md:col-span-2">
           <span className="label">Remarks</span>
           <input className="input" value={form.remarks} onChange={set('remarks')} />
@@ -164,6 +179,7 @@ export function ItemsPage() {
                 <th>Size</th>
                 <th>UOM</th>
                 <th>Category</th>
+                <th className="text-right">Low Level</th>
                 <th>Status</th>
                 <th className="w-72">Remarks</th>
                 <th />
@@ -177,6 +193,7 @@ export function ItemsPage() {
                   <td className="whitespace-nowrap">{formatSize(i)}</td>
                   <td>{i.uom}</td>
                   <td>{i.category}</td>
+                  <td className="text-right">{i.low_stock_level ?? ''}</td>
                   <td>{i.active ? 'Active' : 'Inactive'}</td>
                   <td className="text-slate-500 whitespace-normal break-words">{i.remarks}</td>
                   <td className="text-right whitespace-nowrap space-x-3">
